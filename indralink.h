@@ -21,6 +21,8 @@ enum ilAtomTypes {
     BOOL,
     STRING,
     SYMBOL,
+    STORE_SYMBOL,
+    DELETE_SYMBOL,
     FUNC,
     IFUNC,
     ERROR,
@@ -33,6 +35,7 @@ class IlAtom {
     double vf;
     string vs;
     bool vb;
+    string name;
     std::function<void(vector<IlAtom> *)> vif;
 
     IlAtom() {
@@ -415,6 +418,18 @@ class IndraLink {
             m.t = IFUNC;
             m.vif = inbuilts[token];
             m.vs = token;
+        } else if (is_symbol(token)) {
+            m.t = SYMBOL;
+            m.name = token;
+            m.vs = token;
+        } else if (token.length() > 1 && token[0] == '>') {
+            m.t = STORE_SYMBOL;
+            m.name = token.substr(1);
+            m.vs = token;
+        } else if (token.length() > 1 && token[0] == '!') {
+            m.t = DELETE_SYMBOL;
+            m.name = token.substr(1);
+            m.vs = token;
         }
         return m;
     }
@@ -433,7 +448,18 @@ class IndraLink {
         return true;
     }
 
+    bool is_func(string funcName) {
+        if (funcs.find(funcName) == funcs.end()) return false;
+        return true;
+    }
+
+    bool is_symbol(string symName) {
+        if (symbols.find(symName) == symbols.end()) return false;
+        return true;
+    }
+
     bool eval(vector<IlAtom> func, vector<IlAtom> *pst) {
+        IlAtom res;
         for (auto ila : func) {
             switch (ila.t) {
             case INT:
@@ -445,11 +471,86 @@ class IndraLink {
             case IFUNC:
                 ila.vif(pst);
                 break;
+            case SYMBOL:
+                if (is_symbol(ila.name)) {
+                    IlAtom sym = symbols[ila.name];
+                    switch (sym.t) {
+                    case INT:
+                        res.t = INT;
+                        res.vi = sym.vi;
+                        res.vs = std::to_string(sym.vi);
+                        break;
+                    case FLOAT:
+                        res.t = FLOAT;
+                        res.vf = sym.vf;
+                        res.vs = std::to_string(sym.vf);
+                        break;
+                    case BOOL:
+                        res.t = BOOL;
+                        res.vb = sym.vb;
+                        if (res.vb)
+                            res.vs = "true";
+                        else
+                            res.vb = "false";
+                        break;
+                    case STRING:
+                        res.t = STRING;
+                        res.vs = sym.vs;
+                        break;
+                    default:
+                        res.t = ERROR;
+                        res.vs = "Illegal-Symbol-content-type";
+                        break;
+                    }
+                    pst->push_back(res);
+                } else {
+                    res.t = ERROR;
+                    res.vs = "Undefined-symbol-reference";
+                    pst->push_back(res);
+                }
+                break;
+            case STORE_SYMBOL:
+                if (is_inbuilt(ila.name) || is_func(ila.name)) {
+                    res.t = ERROR;
+                    res.vs = "Name-in-use-by-func";
+                    pst->push_back(res);
+                    continue;
+                }
+                if (pst->size() < 1) {
+                    res.t = ERROR;
+                    res.vs = "Symdef-stack-underflow";
+                    pst->push_back(res);
+                    continue;
+                }
+                res = pst->back();
+                pst->pop_back();
+                if (res.t != INT && res.t != FLOAT && res.t && BOOL && res.t != STRING) {
+                    res.t = ERROR;
+                    res.vs = "Symdef-invalid-type";
+                    pst->push_back(res);
+                    continue;
+                }
+                if (ila.name[0] == '>' || ila.name[0] == '!') {
+                    res.t = ERROR;
+                    res.vs = "Symdef-invalid-name";
+                    pst->push_back(res);
+                    continue;
+                }
+                symbols[ila.name] = res;
+                break;
+            case DELETE_SYMBOL:
+                if (!is_symbol(ila.name)) {
+                    res.t = ERROR;
+                    res.vs = "Symdelete-non-existant";
+                    pst->push_back(res);
+                    continue;
+                }
+                symbols.erase(ila.name);
+                break;
             default:
-                IlAtom err;
-                err.t = ERROR;
-                err.vs = "Not-implemented";
-                pst->push_back(err);
+                res.t = ERROR;
+                res.vs = "Not-implemented";
+                pst->push_back(res);
                 break;
             }
         }
