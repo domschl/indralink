@@ -56,6 +56,8 @@ class IlAtom {
         case IFUNC:
         case FUNC:
         case SYMBOL:
+        case STORE_SYMBOL:
+        case DELETE_SYMBOL:
             return vs;
             break;
         case ERROR:
@@ -308,6 +310,12 @@ class IndraLink {
         pst->pop_back();
     }
 
+    void print(vector<IlAtom> *pst) {
+        IlAtom res = pst->back();
+        cout << res.str();
+        pst->pop_back();
+    }
+
     void stack_size(vector<IlAtom> *pst) {
         size_t l = pst->size();
         IlAtom res;
@@ -335,6 +343,7 @@ class IndraLink {
         inbuilts["cs"] = [&](vector<IlAtom> *pst) { clear_stack(pst); };
         inbuilts["dup"] = [&](vector<IlAtom> *pst) { dup(pst); };
         inbuilts["pop"] = [&](vector<IlAtom> *pst) { pop(pst); };
+        inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
     }
 
     vector<string> split(const string &str, const string &delim) {
@@ -418,10 +427,6 @@ class IndraLink {
             m.t = IFUNC;
             m.vif = inbuilts[token];
             m.vs = token;
-        } else if (is_symbol(token)) {
-            m.t = SYMBOL;
-            m.name = token;
-            m.vs = token;
         } else if (token.length() > 1 && token[0] == '>') {
             m.t = STORE_SYMBOL;
             m.name = token.substr(1);
@@ -429,6 +434,10 @@ class IndraLink {
         } else if (token.length() > 1 && token[0] == '!') {
             m.t = DELETE_SYMBOL;
             m.name = token.substr(1);
+            m.vs = token;
+        } else {
+            m.t = SYMBOL;
+            m.name = token;
             m.vs = token;
         }
         return m;
@@ -568,6 +577,17 @@ class IndraLink {
                 break;
             }
         }
+        if (abort) {
+            if (pst->size() > 0 && (*pst)[pst->size() - 1].t == ERROR) {
+                IlAtom err = pst->back();
+                cout << err.str() << endl;
+                pst->pop_back();
+            } else {
+                cout << endl
+                     << "Terminated with error condition, but no error on stack!" << endl;
+            }
+        }
+
         return !abort;
     }
 };

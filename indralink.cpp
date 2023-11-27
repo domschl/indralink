@@ -123,16 +123,23 @@ void repl(std::string &prompt, std::string &prompt2) {
         //     printf("Err\n");
         //     continue;
         // }
+        std::cout << std::endl;
         auto start = std::chrono::steady_clock::now();
         il.eval(ps, &st);
         std::cout << std::endl;
+        std::cout << "Stack: [";
+        bool first = true;
         for (auto s : st) {
-            std::cout << s.str() << " ";
+            if (first)
+                first = false;
+            else
+                std::cout << " ";
+            std::cout << s.str();
         }
-        std::cout << std::endl;
+        std::cout << "]" << std::endl;
 
         auto diff = std::chrono::steady_clock::now() - start;
-        std::cout << "\nEval dt: "
+        std::cout << "Eval dt: "
                   << std::chrono::duration<double, std::nano>(diff).count()
                   << " ns" << std::endl;
         // ms.printexpr(past);
