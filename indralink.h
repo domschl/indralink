@@ -460,6 +460,7 @@ class IndraLink {
 
     bool eval(vector<IlAtom> func, vector<IlAtom> *pst) {
         IlAtom res;
+        bool abort = false;
         for (auto ila : func) {
             switch (ila.t) {
             case INT:
@@ -470,6 +471,11 @@ class IndraLink {
                 break;
             case IFUNC:
                 ila.vif(pst);
+                if (pst->size() > 0) {
+                    if ((*pst)[pst->size() - 1].t == ERROR) {
+                        abort = true;
+                    }
+                }
                 break;
             case SYMBOL:
                 if (is_symbol(ila.name)) {
@@ -500,6 +506,7 @@ class IndraLink {
                     default:
                         res.t = ERROR;
                         res.vs = "Illegal-Symbol-content-type";
+                        abort = true;
                         break;
                     }
                     pst->push_back(res);
@@ -507,6 +514,7 @@ class IndraLink {
                     res.t = ERROR;
                     res.vs = "Undefined-symbol-reference";
                     pst->push_back(res);
+                    abort = true;
                 }
                 break;
             case STORE_SYMBOL:
@@ -514,13 +522,15 @@ class IndraLink {
                     res.t = ERROR;
                     res.vs = "Name-in-use-by-func";
                     pst->push_back(res);
-                    continue;
+                    abort = true;
+                    break;
                 }
                 if (pst->size() < 1) {
                     res.t = ERROR;
                     res.vs = "Symdef-stack-underflow";
                     pst->push_back(res);
-                    continue;
+                    abort = true;
+                    break;
                 }
                 res = pst->back();
                 pst->pop_back();
@@ -528,13 +538,15 @@ class IndraLink {
                     res.t = ERROR;
                     res.vs = "Symdef-invalid-type";
                     pst->push_back(res);
-                    continue;
+                    abort = true;
+                    break;
                 }
                 if (ila.name[0] == '>' || ila.name[0] == '!') {
                     res.t = ERROR;
                     res.vs = "Symdef-invalid-name";
                     pst->push_back(res);
-                    continue;
+                    abort = true;
+                    break;
                 }
                 symbols[ila.name] = res;
                 break;
@@ -543,7 +555,8 @@ class IndraLink {
                     res.t = ERROR;
                     res.vs = "Symdelete-non-existant";
                     pst->push_back(res);
-                    continue;
+                    abort = true;
+                    break;
                 }
                 symbols.erase(ila.name);
                 break;
@@ -551,10 +564,11 @@ class IndraLink {
                 res.t = ERROR;
                 res.vs = "Not-implemented";
                 pst->push_back(res);
+                abort = true;
                 break;
             }
         }
-        return true;
+        return !abort;
     }
 };
 
