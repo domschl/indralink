@@ -75,25 +75,25 @@ class IndraLink {
         if (l < 2) {
             IlAtom err;
             err.t = ERROR;
-            err.vs = "Not-Enough-Operands";
+            err.vs = "Math-" + ops2 + "-Not-Enough-Operands";
             pst->push_back(err);
             return;
         }
         ilAtomTypes t1, t2;
-        t2 = (*pst)[l - 1].t;
-        t1 = (*pst)[l - 2].t;
-        if ((t1 != INT && t1 != FLOAT) || (t2 != INT && t2 != FLOAT)) {
-            IlAtom err;
-            err.t = ERROR;
-            err.vs = "Wrong-Type-Operands";
-            pst->push_back(err);
-            return;
-        }
         IlAtom res, op1, op2;
         op2 = pst->back();
         pst->pop_back();
         op1 = pst->back();
         pst->pop_back();
+        t2 = op2.t;
+        t1 = op1.t;
+        if ((t1 != INT && t1 != FLOAT) || (t2 != INT && t2 != FLOAT)) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Math-" + ops2 + "-Wrong-Type-Operands";
+            pst->push_back(err);
+            return;
+        }
 
         if (t1 == INT && t2 == INT) {
             int o1, o2;
@@ -110,7 +110,7 @@ class IndraLink {
                 if (o2 == 0) {
                     IlAtom err;
                     err.t = ERROR;
-                    err.vs = "/-Zero";
+                    err.vs = "/-by-Zero";
                     pst->push_back(err);
                     return;
                 }
@@ -123,7 +123,7 @@ class IndraLink {
             } else {
                 IlAtom err;
                 err.t = ERROR;
-                err.vs = "Unknown 2ops: " + ops2;
+                err.vs = "Math-" + ops2 + "Unknown op-code";
                 pst->push_back(err);
                 return;
             }
@@ -149,7 +149,7 @@ class IndraLink {
                 if (o2 == 0.0) {
                     IlAtom err;
                     err.t = ERROR;
-                    err.vs = "/-Zero";
+                    err.vs = "/-by-Zero";
                     pst->push_back(err);
                     return;
                 }
@@ -157,7 +157,7 @@ class IndraLink {
             } else {
                 IlAtom err;
                 err.t = ERROR;
-                err.vs = "Unknown 2ops: " + ops2;
+                err.vs = "Unknown math-2ops: " + ops2;
                 pst->push_back(err);
                 return;
             }
@@ -171,13 +171,120 @@ class IndraLink {
         if (l < 2) {
             IlAtom err;
             err.t = ERROR;
-            err.vs = "Not-Enough-Operands";
+            err.vs = "CMP-Not-Enough-Operands";
             pst->push_back(err);
             return;
         }
         ilAtomTypes t1, t2;
-        t2 = (*pst)[l - 1].t;
-        t1 = (*pst)[l - 2].t;
+        IlAtom res, op1, op2;
+        op2 = pst->back();
+        pst->pop_back();
+        op1 = pst->back();
+        pst->pop_back();
+        t2 = op2.t;
+        t1 = op1.t;
+
+        if ((t1 != INT && t1 != FLOAT) || (t2 != INT && t2 != FLOAT)) {
+            if (t1 == BOOL && t2 == BOOL) {
+                res.t = BOOL;
+                if (ops2 == "==") {
+                    res.vb = (op1.vb == op2.vb);
+                } else if (ops2 == "!=") {
+                    res.vb = (op1.vb != op2.vb);
+                } else {
+                    IlAtom err;
+                    err.t = ERROR;
+                    err.vs = "BOOL-Cmp-" + ops2 + "-Wrong-Type-Operands";
+                    pst->push_back(err);
+                    return;
+                }
+            } else if (t1 == STRING && t2 == STRING) {
+                res.t = BOOL;
+                if (ops2 == "==") {
+                    res.vb = (op1.vs == op2.vs);
+                } else if (ops2 == "!=") {
+                    res.vb = (op1.vs != op2.vs);
+                } else if (ops2 == ">=") {
+                    res.vb = (op1.vs >= op2.vs);
+                } else if (ops2 == "<=") {
+                    res.vb = (op1.vs <= op2.vs);
+                } else if (ops2 == "<") {
+                    res.vb = (op1.vs < op2.vs);
+                } else if (ops2 == ">") {
+                    res.vb = (op1.vs > op2.vs);
+                } else {
+                    IlAtom err;
+                    err.t = ERROR;
+                    err.vs = "BOOL-Cmp-" + ops2 + "-Wrong-Type-Operands";
+                    pst->push_back(err);
+                    return;
+                }
+            } else {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Math-" + ops2 + "-Wrong-Type-Operands";
+                pst->push_back(err);
+                return;
+            }
+        } else {
+            if (t1 == INT && t2 == INT) {
+                res.t = BOOL;
+                if (ops2 == "==") {
+                    res.vb = (op1.vi == op2.vi);
+                } else if (ops2 == "!=") {
+                    res.vb = (op1.vi != op2.vi);
+                } else if (ops2 == ">=") {
+                    res.vb = (op1.vi >= op2.vi);
+                } else if (ops2 == "<=") {
+                    res.vb = (op1.vi <= op2.vi);
+                } else if (ops2 == "<") {
+                    res.vb = (op1.vi < op2.vi);
+                } else if (ops2 == ">") {
+                    res.vb = (op1.vi > op2.vi);
+                } else {
+                    IlAtom err;
+                    err.t = ERROR;
+                    err.vs = "INT-Cmp-" + ops2 + "-Wrong-Type-Operands";
+                    pst->push_back(err);
+                    return;
+                }
+            } else {
+                res.t = BOOL;
+                double o1, o2;
+                if (op1.t == INT)
+                    o1 = op1.vi;
+                else
+                    o1 = op1.vf;
+                if (op2.t == INT)
+                    o2 = op2.vi;
+                else
+                    o2 = op2.vf;
+                if (ops2 == "==") {
+                    res.vb = (o1 == o2);
+                } else if (ops2 == "!=") {
+                    res.vb = (o1 != o2);
+                } else if (ops2 == ">=") {
+                    res.vb = (o1 >= o2);
+                } else if (ops2 == "<=") {
+                    res.vb = (o1 <= o2);
+                } else if (ops2 == "<") {
+                    res.vb = (o1 < o2);
+                } else if (ops2 == ">") {
+                    res.vb = (o1 > o2);
+                } else {
+                    IlAtom err;
+                    err.t = ERROR;
+                    err.vs = "FLOAT-Cmp-" + ops2 + "-Wrong-Type-Operands";
+                    pst->push_back(err);
+                    return;
+                }
+            }
+        }
+        if (res.vb)
+            res.vs = "true";
+        else
+            res.vs = "false";
+        pst->push_back(res);
     }
 
     void dup(vector<IlAtom> *pst) {
@@ -216,6 +323,10 @@ class IndraLink {
             if (cm_op == 0) continue;
             string m_op{cm_op};
             inbuilts[m_op] = [this, m_op](vector<IlAtom> *pst) { math_2ops(pst, m_op); };
+        }
+        for (auto cmp_op : {"==", "!=", ">=", "<=", "<", ">"}) {
+            string m_op{cmp_op};
+            inbuilts[m_op] = [this, m_op](vector<IlAtom> *pst) { cmp_2ops(pst, m_op); };
         }
         inbuilts["ss"] = [&](vector<IlAtom> *pst) { stack_size(pst); };
         inbuilts["cs"] = [&](vector<IlAtom> *pst) { clear_stack(pst); };
