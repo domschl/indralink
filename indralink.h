@@ -854,6 +854,38 @@ class IndraLink {
                 } else if (ila.name == "else") {
                     pc = ila.jump_address;
                 } else if (ila.name == "endif") {
+                } else if (ila.name == "while") {
+                    if (pst->size() == 0) {
+                        res.t = ERROR;
+                        res.vs = "Stack-underflow-on-while";
+                        pst->push_back(res);
+                        abort = true;
+                    } else {
+                        IlAtom b = pst->back();
+                        pst->pop_back();
+                        if (b.t != BOOL && b.t != INT) {
+                            res.t = ERROR;
+                            res.vs = "No-int-or-bool-for-while";
+                            pst->push_back(res);
+                            abort = true;
+                        } else {
+                            if (b.t == BOOL) {
+                                if (b.vb) {
+                                    break;
+                                } else {
+                                    pc = ila.jump_address;
+                                }
+                            } else if (b.t == INT) {
+                                if (b.vi != 0) {
+                                    break;
+                                } else {
+                                    pc = ila.jump_address;
+                                }
+                            }
+                        }
+                    }
+                } else if (ila.name == "loop") {
+                    pc = ila.jump_address - 1;
                 }
                 break;
             case FUNC:
