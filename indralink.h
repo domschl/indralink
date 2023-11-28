@@ -727,6 +727,12 @@ class IndraLink {
                     fc_stack.push_back(pc);
                 } else if (ila.name == "end") {
                 }
+                break;
+            case FUNC:
+                if (is_func(ila.name)) {
+                    eval(funcs[ila.name], pst);
+                }
+                break;
             case SYMBOL:
                 if (is_symbol(ila.name)) {
                     IlAtom sym = symbols[ila.name];
