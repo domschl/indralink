@@ -13,7 +13,7 @@ using std::vector;
 
 /* Code bits
 Integer square-root:
-: isqrt dup dup 2 / dup2 != while dup2 dup >sqrt / + 2 / dup sqrt != loop drop drop drop sqrt ;
+: isqrt dup dup 2 / dup2 != while dup2 dup >sqrt / + 2 / dup sqrt < loop drop drop drop sqrt ;
 */
 
 namespace inlnk {
