@@ -128,12 +128,16 @@ class IndraLink {
                     pst->push_back(err);
                     return;
                 }
-                IlAtom mod;
-                mod.t = INT;
-                mod.vi = o1 % o2;
-                mod.vs = std::to_string(mod.vi);
-                pst->push_back(mod);
                 res.vi = o1 / o2;
+            } else if (ops2 == "%") {
+                if (o2 == 0) {
+                    IlAtom err;
+                    err.t = ERROR;
+                    err.vs = "/-by-Zero";
+                    pst->push_back(err);
+                    return;
+                }
+                res.vi = o1 % o2;
             } else {
                 IlAtom err;
                 err.t = ERROR;
@@ -376,7 +380,7 @@ class IndraLink {
     }
 
     IndraLink() {
-        for (auto cm_op : "+-*/") {
+        for (auto cm_op : "+-*/%") {
             if (cm_op == 0) continue;
             string m_op{cm_op};
             inbuilts[m_op] = [this, m_op](vector<IlAtom> *pst) { math_2ops(pst, m_op); };
