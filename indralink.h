@@ -23,6 +23,7 @@ enum ilAtomTypes {
     STRING,
     SYMBOL,
     COMMENT,
+    DEF_WORD,
     STORE_SYMBOL,
     DELETE_SYMBOL,
     FUNC,
@@ -62,6 +63,8 @@ class IlAtom {
         case STORE_SYMBOL:
         case DELETE_SYMBOL:
         case FLOW_CONTROL:
+        case DEF_WORD:
+        case COMMENT:
             return vs;
             break;
         case ERROR:
@@ -78,7 +81,7 @@ class IndraLink {
     map<string, IlAtom> symbols;
     map<string, vector<IlAtom>> funcs;
     map<string, std::function<void(vector<IlAtom> *)>> inbuilts;
-    vector<string> flow_control_words;
+    vector<string> flow_control_words, def_words;
 
     void math_2ops(vector<IlAtom> *pst, string ops2) {
         size_t l = pst->size();
@@ -351,6 +354,7 @@ class IndraLink {
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
         flow_control_words = {"for", "end", "break", "continue", "if", "else", "while"};
+        def_words = {":", ";"};
     }
 
     vector<string> split_old(const string &str, const string &delim) {
@@ -385,7 +389,7 @@ class IndraLink {
                           WHITE_SPACE,
                           STRING,
                           STRING_ESC,
-                          STRING_END,
+                          // STRING_END,
                           COMMENT1,
                           COMMENT2 };
         SplitState state = START;
@@ -429,7 +433,7 @@ class IndraLink {
                 }
             case STRING_ESC:
                 if (c == 'n' || c == 'r' || c == 't') {
-                    tok += "\\" + c;
+                    tok += "\\" + std::to_string(c);
                 } else {
                     tok += c;
                 }
@@ -528,6 +532,9 @@ class IndraLink {
         if (is_comment(token)) {
             m.t = COMMENT;
             m.vs = token;
+        } else if (is_def_word(token)) {
+            m.t = DEF_WORD;
+            m.vs = token;
         } else if (is_int(token)) {
             m.t = INT;
             m.vi = atoi(token.c_str());
@@ -553,6 +560,10 @@ class IndraLink {
         } else if (is_inbuilt(token)) {
             m.t = IFUNC;
             m.vif = inbuilts[token];
+            m.vs = token;
+        } else if (is_func(token)) {
+            m.t = FUNC;
+            m.name = token;
             m.vs = token;
         } else if (token.length() > 1 && token[0] == '>') {
             m.t = STORE_SYMBOL;
@@ -599,8 +610,29 @@ class IndraLink {
         return true;
     }
 
+    bool is_def_word(string symName) {
+        if (std::find(def_words.begin(), def_words.end(), symName) == def_words.end()) return false;
+        return true;
+    }
+
     bool is_reserved(string name) {
-        return is_inbuilt(name) || is_flow_control(name);
+        return is_inbuilt(name) || is_flow_control(name) || is_def_word(name);
+    }
+
+    string store_def(vector<IlAtom> funcDef) {
+        if (funcDef.size() < 2) {
+            return "Func-Def-Too-Short: " + std::to_string(funcDef.size());
+        }
+        if (funcDef[0].t != SYMBOL) {
+            return "Func-Def-First-Element-Must-be-Symbol";
+        }
+        string name = funcDef[0].vs;
+        if (is_reserved(name)) {
+            return "Func-Def-Name-is-reserved";
+        }
+        funcDef.erase(funcDef.begin());
+        funcs[name] = funcDef;
+        return "";
     }
 
     bool eval(vector<IlAtom> func, vector<IlAtom> *pst) {
@@ -611,13 +643,69 @@ class IndraLink {
         IlAtom ila;
         map<int, int> for_counter, for_max;
         map<int, int> if_end, if_else;
+        bool is_def = false;
+        vector<IlAtom> funcDef;
+        vector<IlAtom> newFunc;
+        string err;
+        newFunc.clear();
+        funcDef.clear();
         for (int pc = 0; pc < func.size(); pc++) {
             ila = func[pc];
-            if (ila.name == "for") {
+            if (!is_def) {
+                if (ila.t == DEF_WORD) {
+                    if (ila.vs == ":") {
+                        is_def = true;
+                    } else if (ila.vs == ";") {
+                        res.t = ERROR;
+                        res.vs = "Def-End-Outside-Def";
+                        abort = true;
+                        pst->push_back(res);
+                        break;
+                    }
+                } else {
+                    newFunc.push_back(ila);
+                }
+            } else {
+                if (ila.t == DEF_WORD) {
+                    if (ila.vs == ":") {
+                        res.t = ERROR;
+                        res.vs = "Nested-Def-Illegal";
+                        abort = true;
+                        pst->push_back(res);
+                        break;
+                    } else if (ila.vs == ";") {
+                        is_def = false;
+                        err = store_def(funcDef);
+                        if (err != "") {
+                            res.t = ERROR;
+                            res.vs = err;
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        funcDef.clear();
+                    }
+                } else {
+                    funcDef.push_back(ila);
+                    cout << "funcDef: " << funcDef.size() << endl;
+                }
             }
         }
-        while (!abort && pc < func.size()) {
-            ila = func[pc];
+        if (is_def) {
+            res.t = ERROR;
+            res.vs = "Unterminated-func-def";
+            abort = true;
+            pst->push_back(res);
+        }
+        if (!abort) {
+            for (int pc = 0; pc < newFunc.size(); pc++) {
+                ila = newFunc[pc];
+                if (ila.name == "for") {
+                }
+            }
+        }
+        while (!abort && pc < newFunc.size()) {
+            ila = newFunc[pc];
             // for (auto ila : func) {
             switch (ila.t) {
             case INT:
