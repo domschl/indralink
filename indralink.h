@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <map>
 #include <functional>
 
@@ -21,10 +22,12 @@ enum ilAtomTypes {
     BOOL,
     STRING,
     SYMBOL,
+    COMMENT,
     STORE_SYMBOL,
     DELETE_SYMBOL,
     FUNC,
     IFUNC,
+    FLOW_CONTROL,
     ERROR,
 };
 
@@ -58,6 +61,7 @@ class IlAtom {
         case SYMBOL:
         case STORE_SYMBOL:
         case DELETE_SYMBOL:
+        case FLOW_CONTROL:
             return vs;
             break;
         case ERROR:
@@ -74,6 +78,7 @@ class IndraLink {
     map<string, IlAtom> symbols;
     map<string, vector<IlAtom>> funcs;
     map<string, std::function<void(vector<IlAtom> *)>> inbuilts;
+    vector<string> flow_control_words;
 
     void math_2ops(vector<IlAtom> *pst, string ops2) {
         size_t l = pst->size();
@@ -306,7 +311,7 @@ class IndraLink {
         pst->push_back(res);
     }
 
-    void pop(vector<IlAtom> *pst) {
+    void drop(vector<IlAtom> *pst) {
         pst->pop_back();
     }
 
@@ -342,11 +347,13 @@ class IndraLink {
         inbuilts["ss"] = [&](vector<IlAtom> *pst) { stack_size(pst); };
         inbuilts["cs"] = [&](vector<IlAtom> *pst) { clear_stack(pst); };
         inbuilts["dup"] = [&](vector<IlAtom> *pst) { dup(pst); };
-        inbuilts["pop"] = [&](vector<IlAtom> *pst) { pop(pst); };
+        inbuilts["drop"] = [&](vector<IlAtom> *pst) { drop(pst); };
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
+        inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
+        flow_control_words = {"for", "end", "break", "continue", "if", "else", "while"};
     }
 
-    vector<string> split(const string &str, const string &delim) {
+    vector<string> split_old(const string &str, const string &delim) {
         // XXX: needs proper white-space treatment, comment and string handling! DOES NOT WORK LIKE THIS!
         vector<string> tokens;
         size_t prev = 0, pos = 0;
@@ -361,6 +368,112 @@ class IndraLink {
             if (!token.empty()) tokens.push_back(token);
             prev = pos + delim.length();
         } while (pos < str.length() && prev < str.length());
+        return tokens;
+    }
+
+    bool is_white_space(char c) {
+        if (c == ' ' || c == '\n' || c == '\r' || c == '\t') return true;
+        return false;
+    }
+
+    vector<string> split(const string &str, const string &delim) {
+        // XXX: needs proper white-space treatment, comment and string handling! DOES NOT WORK LIKE THIS!
+        vector<string> tokens;
+        string tok;
+        enum SplitState { START,
+                          TOKEN,
+                          WHITE_SPACE,
+                          STRING,
+                          STRING_ESC,
+                          STRING_END,
+                          COMMENT1,
+                          COMMENT2 };
+        SplitState state = START;
+        for (auto c : str) {
+            switch (state) {
+            case WHITE_SPACE:
+                if (is_white_space(c)) {
+                    continue;
+                }
+                // fall through:
+            case START: {
+                switch (c) {
+                case '"':
+                    state = STRING;
+                    tok = c;
+                    continue;
+                case '(':
+                    state = COMMENT1;
+                    tok = c;
+                    continue;
+                case '\\':
+                    state = COMMENT2;
+                    tok = c;
+                    continue;
+                default:
+                    state = TOKEN;
+                    tok = c;
+                    continue;
+                }
+            case TOKEN:
+                if (is_white_space(c)) {
+                    if (tok.length() > 0) {
+                        tokens.push_back(tok);
+                        tok = "";
+                    }
+                    state = WHITE_SPACE;
+                    continue;
+                } else {
+                    tok += c;
+                    continue;
+                }
+            case STRING_ESC:
+                if (c == 'n' || c == 'r' || c == 't') {
+                    tok += "\\" + c;
+                } else {
+                    tok += c;
+                }
+                state = STRING;
+                continue;
+            case STRING:
+                if (c == '\\') {
+                    state = STRING_ESC;
+                    continue;
+                }
+                if (c == '"') {
+                    tok += c;
+                    tokens.push_back(tok);
+                    tok = "";
+                    state = WHITE_SPACE;
+                    continue;
+                } else {
+                    tok += c;
+                    continue;
+                }
+            case COMMENT1:
+                if (c == ')') {
+                    tok += c;
+                    tokens.push_back(tok);
+                    tok = "";
+                    state = WHITE_SPACE;
+                    continue;
+                } else {
+                    tok += c;
+                    continue;
+                }
+            case COMMENT2:
+                if (c == '\n' || c == '\r') {
+                    tokens.push_back(tok);
+                    tok = "";
+                    state = WHITE_SPACE;
+                    continue;
+                } else {
+                    tok += c;
+                    continue;
+                }
+            }
+            }
+        }
         return tokens;
     }
 
@@ -400,12 +513,22 @@ class IndraLink {
         }
     }
 
+    bool is_comment(string token) {
+        if (token.length() > 0 && (token[0] == '\\' || token[0] == '('))
+            return true;
+        else
+            return false;
+    }
+
     IlAtom parse_tok(string token) {
         IlAtom m;
         m.t = ERROR;
         m.vs = "Parse";
 
-        if (is_int(token)) {
+        if (is_comment(token)) {
+            m.t = COMMENT;
+            m.vs = token;
+        } else if (is_int(token)) {
             m.t = INT;
             m.vi = atoi(token.c_str());
             m.vs = token;
@@ -423,6 +546,10 @@ class IndraLink {
         } else if (token.length() > 1 && token[0] == '"' && token[token.length() - 1] == '"') {
             m.t = STRING;
             m.vs = token.substr(1, token.length() - 2);
+        } else if (is_flow_control(token)) {
+            m.t = FLOW_CONTROL;
+            m.vs = token;
+            m.name = token;
         } else if (is_inbuilt(token)) {
             m.t = IFUNC;
             m.vif = inbuilts[token];
@@ -467,10 +594,31 @@ class IndraLink {
         return true;
     }
 
+    bool is_flow_control(string symName) {
+        if (std::find(flow_control_words.begin(), flow_control_words.end(), symName) == flow_control_words.end()) return false;
+        return true;
+    }
+
+    bool is_reserved(string name) {
+        return is_inbuilt(name) || is_flow_control(name);
+    }
+
     bool eval(vector<IlAtom> func, vector<IlAtom> *pst) {
         IlAtom res;
         bool abort = false;
-        for (auto ila : func) {
+        int pc = 0;
+        vector<int> fc_stack;
+        IlAtom ila;
+        map<int, int> for_counter, for_max;
+        map<int, int> if_end, if_else;
+        for (int pc = 0; pc < func.size(); pc++) {
+            ila = func[pc];
+            if (ila.name == "for") {
+            }
+        }
+        while (!abort && pc < func.size()) {
+            ila = func[pc];
+            // for (auto ila : func) {
             switch (ila.t) {
             case INT:
             case FLOAT:
@@ -486,6 +634,11 @@ class IndraLink {
                     }
                 }
                 break;
+            case FLOW_CONTROL:
+                if (ila.name == "for") {
+                    fc_stack.push_back(pc);
+                } else if (ila.name == "end") {
+                }
             case SYMBOL:
                 if (is_symbol(ila.name)) {
                     IlAtom sym = symbols[ila.name];
@@ -527,7 +680,7 @@ class IndraLink {
                 }
                 break;
             case STORE_SYMBOL:
-                if (is_inbuilt(ila.name) || is_func(ila.name)) {
+                if (is_reserved(ila.name) || is_func(ila.name)) {
                     res.t = ERROR;
                     res.vs = "Name-in-use-by-func";
                     pst->push_back(res);
@@ -569,6 +722,8 @@ class IndraLink {
                 }
                 symbols.erase(ila.name);
                 break;
+            case COMMENT:
+                break;
             default:
                 res.t = ERROR;
                 res.vs = "Not-implemented";
@@ -576,6 +731,7 @@ class IndraLink {
                 abort = true;
                 break;
             }
+            ++pc;
         }
         if (abort) {
             if (pst->size() > 0 && (*pst)[pst->size() - 1].t == ERROR) {
