@@ -41,6 +41,7 @@ class IlAtom {
     bool vb;
     string name;
     std::function<void(vector<IlAtom> *)> vif;
+    int jump_address;
 
     IlAtom() {
         t = ERROR;
@@ -320,7 +321,10 @@ class IndraLink {
 
     void print(vector<IlAtom> *pst) {
         IlAtom res = pst->back();
-        cout << res.str();
+        if (res.t == STRING)
+            cout << res.vs;
+        else
+            cout << res.str();
         pst->pop_back();
     }
 
@@ -353,7 +357,7 @@ class IndraLink {
         inbuilts["drop"] = [&](vector<IlAtom> *pst) { drop(pst); };
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
-        flow_control_words = {"for", "end", "break", "continue", "if", "else", "while"};
+        flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
         def_words = {":", ";"};
     }
 
@@ -432,8 +436,9 @@ class IndraLink {
                     continue;
                 }
             case STRING_ESC:
-                if (c == 'n' || c == 'r' || c == 't') {
-                    tok += "\\" + std::to_string(c);
+                if (c == 'n') {
+                    string sc = {10};
+                    tok += sc;
                 } else {
                     tok += c;
                 }
@@ -641,14 +646,12 @@ class IndraLink {
         int pc = 0;
         vector<int> fc_stack;
         IlAtom ila;
-        map<int, int> for_counter, for_max;
-        map<int, int> if_end, if_else;
         bool is_def = false;
         vector<IlAtom> funcDef;
         vector<IlAtom> newFunc;
         string err;
-        newFunc.clear();
-        funcDef.clear();
+        vector<int> for_level, else_level, while_level, if_level;
+        // Exctract function defintions:
         for (int pc = 0; pc < func.size(); pc++) {
             ila = func[pc];
             if (!is_def) {
@@ -697,13 +700,108 @@ class IndraLink {
             abort = true;
             pst->push_back(res);
         }
+        // Search for branching instructions and establish jump targets:
         if (!abort) {
             for (int pc = 0; pc < newFunc.size(); pc++) {
                 ila = newFunc[pc];
-                if (ila.name == "for") {
+                if (ila.t == FLOW_CONTROL) {
+                    if (ila.name == "for") {
+                        if (pc < 3) {
+                            res.t = ERROR;
+                            res.vs = "Not enough stack data before 'for' instruction (3 required)";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        for_level.push_back(pc);
+                    } else if (ila.name == "next") {
+                        if (for_level.size() == 0) {
+                            res.t = ERROR;
+                            res.vs = "'next' without 'for'";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        int for_address = for_level.back();
+                        newFunc[pc].jump_address = for_address;
+                        newFunc[for_address].jump_address = pc;
+                        for_level.pop_back();
+                    } else if (ila.name == "if") {
+                        if (pc < 1) {
+                            res.t = ERROR;
+                            res.vs = "Not enough stack data before 'if' instruction (1 required)";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        if_level.push_back(pc);
+                        newFunc[pc].jump_address = 0;
+                    } else if (ila.name == "else") {
+                        if (if_level.size() - else_level.size() != 1) {
+                            res.t = ERROR;
+                            res.vs = "Unexpected 'else' statement!";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        int if_address = if_level.back();
+                        newFunc[if_address].jump_address = pc;
+                        else_level.push_back(if_address);
+                    } else if (ila.name == "endif") {
+                        if (if_level.size() == 0) {
+                            res.t = ERROR;
+                            res.vs = "'then' without 'if'";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        int if_address = if_level.back();
+                        if (newFunc[if_address].jump_address == 0) {
+                            newFunc[if_address].jump_address = pc;
+                        } else {
+                            int else_address = newFunc[if_address].jump_address;
+                            newFunc[else_address].jump_address = pc;
+                        }
+                        if_level.pop_back();
+                    } else if (ila.name == "while") {
+                        if (pc < 1) {
+                            res.t = ERROR;
+                            res.vs = "Not enough stack data before 'while' instruction (1 required)";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        while_level.push_back(pc);
+                    } else if (ila.name == "loop") {
+                        if (while_level.size() == 0) {
+                            res.t = ERROR;
+                            res.vs = "'loop' without 'while'";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        int while_address = while_level.back();
+                        newFunc[pc].jump_address = while_address;
+                        newFunc[while_address].jump_address = pc;
+                        while_level.pop_back();
+                    }
                 }
             }
         }
+        if (!abort) {
+            if (for_level.size() > 0) {
+                res.t = ERROR;
+                res.vs = "'for' without closing 'next''";
+                abort = true;
+                pst->push_back(res);
+            } else if (if_level.size() > 0) {
+                res.t = ERROR;
+                res.vs = "'if' without closing 'endif''";
+                abort = true;
+                pst->push_back(res);
+            }
+        }
+        // Eval:
         while (!abort && pc < newFunc.size()) {
             ila = newFunc[pc];
             // for (auto ila : func) {
@@ -723,9 +821,39 @@ class IndraLink {
                 }
                 break;
             case FLOW_CONTROL:
-                if (ila.name == "for") {
-                    fc_stack.push_back(pc);
-                } else if (ila.name == "end") {
+                if (ila.name == "if") {
+                    if (pst->size() == 0) {
+                        res.t = ERROR;
+                        res.vs = "Stack-underflow-on-if";
+                        pst->push_back(res);
+                        abort = true;
+                    } else {
+                        IlAtom b = pst->back();
+                        pst->pop_back();
+                        if (b.t != BOOL && b.t != INT) {
+                            res.t = ERROR;
+                            res.vs = "No-int-or-bool-for-if";
+                            pst->push_back(res);
+                            abort = true;
+                        } else {
+                            if (b.t == BOOL) {
+                                if (b.vb) {
+                                    break;
+                                } else {
+                                    pc = ila.jump_address;
+                                }
+                            } else if (b.t == INT) {
+                                if (b.vi != 0) {
+                                    break;
+                                } else {
+                                    pc = ila.jump_address;
+                                }
+                            }
+                        }
+                    }
+                } else if (ila.name == "else") {
+                    pc = ila.jump_address;
+                } else if (ila.name == "endif") {
                 }
                 break;
             case FUNC:
