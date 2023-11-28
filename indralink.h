@@ -11,6 +11,11 @@ using std::map;
 using std::string;
 using std::vector;
 
+/* Code bits
+Integer square-root:
+: isqrt dup dup 2 / dup2 != while dup2 dup >sqrt / + 2 / dup sqrt != loop drop drop drop sqrt ;
+*/
+
 namespace inlnk {
 
 static string infSymbol = "∞";
@@ -316,7 +321,6 @@ class IndraLink {
         }
         IlAtom res = pst->back();
         pst->push_back(res);
-        pst->push_back(res);
     }
 
     void dup2(vector<IlAtom> *pst) {
@@ -375,6 +379,20 @@ class IndraLink {
         pst->push_back(res);
     }
 
+    void show_stack(vector<IlAtom> *pst) {
+        cout << "[";
+        bool first = true;
+        for (auto il : *pst) {
+            if (first) {
+                first = false;
+            } else {
+                cout << ", ";
+            }
+            cout << il.str();
+        }
+        cout << "]" << endl;
+    }
+
     void clear_stack(vector<IlAtom> *pst) {
         pst->clear();
     }
@@ -397,6 +415,7 @@ class IndraLink {
         inbuilts["swap"] = [&](vector<IlAtom> *pst) { swap(pst); };
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
+        inbuilts["printstack"] = [&](vector<IlAtom> *pst) { show_stack(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
         def_words = {":", ";"};
     }
@@ -668,7 +687,7 @@ class IndraLink {
         if (funcDef.size() < 2) {
             return "Func-Def-Too-Short: " + std::to_string(funcDef.size());
         }
-        if (funcDef[0].t != SYMBOL) {
+        if (funcDef[0].t != SYMBOL && funcDef[0].t != FUNC) {
             return "Func-Def-First-Element-Must-be-Symbol";
         }
         string name = funcDef[0].vs;
@@ -691,6 +710,7 @@ class IndraLink {
         vector<IlAtom> newFunc;
         string err;
         vector<int> for_level, else_level, while_level, if_level;
+        int cycles = 0;
         // Exctract function defintions:
         for (int pc = 0; pc < func.size(); pc++) {
             ila = func[pc];
@@ -730,7 +750,6 @@ class IndraLink {
                     }
                 } else {
                     funcDef.push_back(ila);
-                    cout << "funcDef: " << funcDef.size() << endl;
                 }
             }
         }
@@ -843,6 +862,13 @@ class IndraLink {
         }
         // Eval:
         while (!abort && pc < newFunc.size()) {
+            ++cycles;
+            if (cycles > 500) {
+                cout << endl
+                     << "ABORT PROGRAM RUNTIME EXCEEDED" << endl;
+                abort = true;
+            }
+
             ila = newFunc[pc];
             // for (auto ila : func) {
             switch (ila.t) {
@@ -968,7 +994,7 @@ class IndraLink {
                     pst->push_back(res);
                 } else {
                     res.t = ERROR;
-                    res.vs = "Undefined-symbol-reference";
+                    res.vs = "Undefined-symbol-reference: <" + ila.name + ">";
                     pst->push_back(res);
                     abort = true;
                 }
