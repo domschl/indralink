@@ -306,12 +306,46 @@ class IndraLink {
         if (l < 1) {
             IlAtom err;
             err.t = ERROR;
-            err.vs = "Stack-Underflow";
+            err.vs = "Stack-Underflow dup";
             pst->push_back(err);
             return;
         }
         IlAtom res = pst->back();
         pst->push_back(res);
+        pst->push_back(res);
+    }
+
+    void dup2(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow dup2";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom res2 = pst->back();
+        pst->pop_back();
+        IlAtom res = pst->back();
+        pst->push_back(res2);
+        pst->push_back(res);
+        pst->push_back(res2);
+    }
+
+    void swap(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow swap";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom res2 = pst->back();
+        pst->pop_back();
+        IlAtom res = pst->back();
+        pst->pop_back();
+        pst->push_back(res2);
         pst->push_back(res);
     }
 
@@ -355,6 +389,8 @@ class IndraLink {
         inbuilts["cs"] = [&](vector<IlAtom> *pst) { clear_stack(pst); };
         inbuilts["dup"] = [&](vector<IlAtom> *pst) { dup(pst); };
         inbuilts["drop"] = [&](vector<IlAtom> *pst) { drop(pst); };
+        inbuilts["dup2"] = [&](vector<IlAtom> *pst) { dup2(pst); };
+        inbuilts["swap"] = [&](vector<IlAtom> *pst) { swap(pst); };
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
