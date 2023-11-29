@@ -32,6 +32,8 @@ enum ilAtomTypes {
     STORE_SYMBOL,
     DELETE_SYMBOL,
     FUNC,
+    SHOW_FUNC,
+    DELETE_FUNC,
     IFUNC,
     FLOW_CONTROL,
     ERROR,
@@ -65,6 +67,8 @@ class IlAtom {
             break;
         case IFUNC:
         case FUNC:
+        case SHOW_FUNC:
+        case DELETE_FUNC:
         case SYMBOL:
         case STORE_SYMBOL:
         case DELETE_SYMBOL:
@@ -397,6 +401,19 @@ class IndraLink {
         pst->clear();
     }
 
+    void list_vars(vector<IlAtom> *pst) {
+        for (const auto &symPair : symbols) {
+            IlAtom il = symPair.second;
+            cout << il.str() << " >" << symPair.first << endl;
+        }
+    }
+
+    void list_funcs(vector<IlAtom> *pst) {
+        for (const auto &funcPair : funcs) {
+            show_func(funcPair.first);
+        }
+    }
+
     IndraLink() {
         for (auto cm_op : "+-*/%") {
             if (cm_op == 0) continue;
@@ -416,6 +433,8 @@ class IndraLink {
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["printstack"] = [&](vector<IlAtom> *pst) { show_stack(pst); };
+        inbuilts["listvars"] = [&](vector<IlAtom> *pst) { list_vars(pst); };
+        inbuilts["listfuncs"] = [&](vector<IlAtom> *pst) { list_funcs(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
         def_words = {":", ";"};
     }
@@ -629,6 +648,14 @@ class IndraLink {
             m.t = FUNC;
             m.name = token;
             m.vs = token;
+        } else if (token.length() > 1 && token[0] == '?' && is_func(token.substr(1))) {
+            m.t = SHOW_FUNC;
+            m.name = token.substr(1);
+            m.vs = token;
+        } else if (token.length() > 1 && token[0] == '!' && is_func(token.substr(1))) {
+            m.t = DELETE_FUNC;
+            m.name = token.substr(1);
+            m.vs = token;
         } else if (token.length() > 1 && token[0] == '>') {
             m.t = STORE_SYMBOL;
             m.name = token.substr(1);
@@ -694,9 +721,21 @@ class IndraLink {
         if (is_reserved(name)) {
             return "Func-Def-Name-is-reserved";
         }
+        if (name[0] == '?' || name[0] == '!') {
+            return "Illegal-Func-Def-name-first-char";
+        }
         funcDef.erase(funcDef.begin());
         funcs[name] = funcDef;
         return "";
+    }
+
+    void show_func(string name) {
+        vector<IlAtom> func = funcs[name];
+        cout << ": " << name << " ";
+        for (auto il : func) {
+            cout << il.str() << " ";
+        }
+        cout << ";" << endl;
     }
 
     bool eval(vector<IlAtom> func, vector<IlAtom> *pst) {
@@ -957,8 +996,32 @@ class IndraLink {
             case FUNC:
                 if (is_func(ila.name)) {
                     eval(funcs[ila.name], pst);
+                } else {
+                    res.t = ERROR;
+                    res.vs = "Func-does-not-exist: " + ila.name;
+                    abort = true;
+                    break;
                 }
                 break;
+            case SHOW_FUNC:
+                if (is_func(ila.name)) {
+                    show_func(ila.name);
+                } else {
+                    res.t = ERROR;
+                    res.vs = "Func-does-not-exist: " + ila.name;
+                    abort = true;
+                    break;
+                }
+                break;
+            case DELETE_FUNC:
+                if (is_func(ila.name)) {
+                    funcs.erase(ila.name);
+                } else {
+                    res.t = ERROR;
+                    res.vs = "Func-does-not-exist: " + ila.name;
+                    abort = true;
+                    break;
+                }
             case SYMBOL:
                 if (is_symbol(ila.name)) {
                     IlAtom sym = symbols[ila.name];

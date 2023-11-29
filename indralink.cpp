@@ -13,6 +13,10 @@ using inlnk::IlAtom;
 using inlnk::IndraLink;
 using std::string;
 
+vector<string> input_history;
+size_t max_input_history_len = 10;
+size_t input_history_stack = 0;
+
 bool initCharReader(struct termios *pTermSaved) {
     struct termios t;
     // Set terminal to single character mode.
@@ -47,7 +51,10 @@ string charReader(string prompt, bool *pQuit) {
     // Read single characters from cin.
     std::streambuf *pbuf = std::cin.rdbuf();
     bool done = false;
+    bool esc_mode = false;
+    string esc_string = "";
     string inp = "";
+    string large_space = "                                                                                ";  // XXX
     std::cout << prompt;
 
     while (!done) {
@@ -58,6 +65,11 @@ string charReader(string prompt, bool *pQuit) {
         switch (c) {
         case 0x0a:
         case 0x0d:
+            input_history_stack = input_history.size();
+            input_history.push_back(inp);
+            if (input_history.size() > max_input_history_len) {
+                input_history.erase(input_history.begin());
+            }
             done = true;
             break;
         case 0x03:
@@ -73,15 +85,52 @@ string charReader(string prompt, bool *pQuit) {
                 std::cout << "\r" + prompt + inp << std::flush;
             }
             break;
+        case 0x1b:
+            esc_mode = true;
+            esc_string = "";
+            break;
         default:
-            inp += c;
-            if (c < 32) {
-                std::cout << "[0x" << std::setw(2) << std::setfill('0')
-                          << std::hex << int(c) << "]" << std::flush;
+            if (!esc_mode) {
+                inp += c;
+                if (c < 32) {
+                    std::cout << "[0x" << std::setw(2) << std::setfill('0')
+                              << std::hex << int(c) << "]" << std::flush;
+                } else {
+                    //  std::cout << "[0x" << std::setw(2) << std::setfill('0') <<
+                    //  std::hex << int(c) << "]" << std::flush;
+                    std::cout << c << std::flush;
+                }
             } else {
-                //  std::cout << "[0x" << std::setw(2) << std::setfill('0') <<
-                //  std::hex << int(c) << "]" << std::flush;
-                std::cout << c << std::flush;
+                esc_string += c;
+                if (esc_string == "[A") {
+                    if (input_history.size() == input_history_stack + 1) {
+                        input_history.push_back(inp);
+                        inp = input_history[input_history_stack];
+                        cout << "\r" << prompt << inp << large_space << std::flush;
+                        cout << "\r" << prompt << inp << std::flush;
+                    } else {
+                        if (input_history_stack > 0) {
+                            --input_history_stack;
+                            inp = input_history[input_history_stack];
+                            cout << "\r" << prompt << inp << large_space << std::flush;
+                            cout << "\r" << prompt << inp << std::flush;
+                        }
+                    }
+                    esc_mode = false;
+                    esc_string = "";
+                } else if (esc_string == "[B") {
+                    if (input_history.size() > input_history_stack + 1) {
+                        ++input_history_stack;
+                        inp = input_history[input_history_stack];
+                        cout << "\r" << prompt << inp << large_space << std::flush;
+                        cout << "\r" << prompt << inp << std::flush;
+                    }
+                    esc_mode = false;
+                    esc_string = "";
+                } else if (esc_string.length() > 1) {
+                    esc_mode = false;
+                    esc_string = "";
+                }
             }
             break;
         }
@@ -142,27 +191,6 @@ void repl(std::string &prompt, std::string &prompt2) {
         std::cout << "Eval dt: "
                   << std::chrono::duration<double, std::nano>(diff).count()
                   << " ns" << std::endl;
-        // ms.printexpr(past);
-        // if (past != nullptr) {
-        //     ans = past->to_str();
-        //     if (past->val != nullptr) {
-        //         free(past->val);
-        //         past->val = nullptr;
-        //     }
-        //     delete past;
-        // } else
-        //     ans = "ok.";
-
-        // printf("-> %s\n", ans.c_str());
-
-        // for (auto ap : ast) {
-        //     if (past != ap) {
-        //         if (ap->val != nullptr)
-        //             free(ap->val);
-        //         ap->val = nullptr;
-        //         delete ap;
-        //     }
-        // }
     }
 }
 
