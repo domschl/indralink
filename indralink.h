@@ -414,6 +414,70 @@ class IndraLink {
         }
     }
 
+    void save(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow-no-filename-on-save";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom filedesc = pst->back();
+        pst->pop_back();
+        if (filedesc.t != STRING) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "filename-must-be-string-on-save";
+            pst->push_back(err);
+            return;
+        }
+        FILE *fp = fopen(filedesc.vs.c_str(), "w");
+        if (fp) {
+            for (const auto &funcPair : funcs) {
+                string name = funcPair.first;
+                vector<IlAtom> func = funcPair.second;
+                fprintf(fp, ": %s ", name.c_str());
+                for (auto il : func) {
+                    fprintf(fp, "%s ", il.str().c_str());
+                }
+                fprintf(fp, ";\n");
+            }
+            fclose(fp);
+        }
+    }
+
+    void load(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow-no-filename-on-load";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom filedesc = pst->back();
+        pst->pop_back();
+        if (filedesc.t != STRING) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "filename-must-be-string-on-load";
+            pst->push_back(err);
+            return;
+        }
+        char buf[129];
+        int no;
+        string cmd = "";
+        FILE *fp = fopen(filedesc.vs.c_str(), "r");
+        if (fp) {
+            no = fread(buf, 1, 128, fp);
+            buf[no] = 0;
+            cmd += buf;
+        }
+        vector<IlAtom> ps = parse(cmd);
+        eval(ps, pst);
+    }
+
     IndraLink() {
         for (auto cm_op : "+-*/%") {
             if (cm_op == 0) continue;
@@ -435,6 +499,8 @@ class IndraLink {
         inbuilts["printstack"] = [&](vector<IlAtom> *pst) { show_stack(pst); };
         inbuilts["listvars"] = [&](vector<IlAtom> *pst) { list_vars(pst); };
         inbuilts["listfuncs"] = [&](vector<IlAtom> *pst) { list_funcs(pst); };
+        inbuilts["save"] = [&](vector<IlAtom> *pst) { save(pst); };
+        inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
         def_words = {":", ";"};
     }
