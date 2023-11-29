@@ -497,6 +497,30 @@ class IndraLink {
         eval(ps, pst);
     }
 
+    void string_eval(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow-no-filename-on-dyn-eval";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom ila = pst->back();
+        pst->pop_back();
+        if (ila.t != STRING) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Dyn-eval-requires-string-argument";
+            pst->push_back(err);
+            return;
+        }
+        string cmd = ila.vs;
+        // replaceAll(cmd, "\\n", "\n");
+        vector<IlAtom> ps = parse(cmd);
+        eval(ps, pst);
+    }
+
     IndraLink() {
         for (auto cm_op : "+-*/%") {
             if (cm_op == 0) continue;
@@ -520,6 +544,7 @@ class IndraLink {
         inbuilts["listfuncs"] = [&](vector<IlAtom> *pst) { list_funcs(pst); };
         inbuilts["save"] = [&](vector<IlAtom> *pst) { save(pst); };
         inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
+        inbuilts["eval"] = [&](vector<IlAtom> *pst) { string_eval(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
         def_words = {":", ";"};
     }
@@ -542,7 +567,7 @@ class IndraLink {
                           COMMENT1,
                           COMMENT2 };
         SplitState state = START;
-        for (auto c : str) {
+        for (auto c : str + " ") {
             switch (state) {
             case WHITE_SPACE:
                 if (is_white_space(c)) {
