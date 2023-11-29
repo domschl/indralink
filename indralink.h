@@ -329,6 +329,60 @@ class IndraLink {
         pst->push_back(res);
     }
 
+    void bool_2ops(vector<IlAtom> *pst, string ops2) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Bool-Not-Enough-Operands";
+            pst->push_back(err);
+            return;
+        }
+        ilAtomTypes t1, t2;
+        IlAtom res, op1, op2;
+        op2 = pst->back();
+        pst->pop_back();
+        op1 = pst->back();
+        pst->pop_back();
+        t2 = op2.t;
+        t1 = op1.t;
+
+        if ((t1 != INT && t1 != BOOL) || (t2 != INT && t2 != BOOL)) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Bool-requires-int-or-bool-Operands";
+            pst->push_back(err);
+            return;
+        }
+        bool b1, b2;
+        if (t1 == BOOL)
+            b1 = op1.vb;
+        else {
+            if (op1.vi == 0)
+                b1 = false;
+            else
+                b1 = true;
+        }
+        if (t2 == BOOL)
+            b2 = op2.vb;
+        else {
+            if (op2.vi == 0)
+                b2 = false;
+            else
+                b2 = true;
+        }
+        res.t = BOOL;
+        if (ops2 == "and")
+            res.vb = (b1 && b2);
+        else if (ops2 == "or")
+            res.vb = (b1 || b2);
+        if (res.vb)
+            res.vs = "true";
+        else
+            res.vs = "false";
+        pst->push_back(res);
+    }
+
     void dup(vector<IlAtom> *pst) {
         size_t l = pst->size();
         if (l < 1) {
@@ -531,6 +585,10 @@ class IndraLink {
         for (auto cmp_op : {"==", "!=", ">=", "<=", "<", ">"}) {
             string m_op{cmp_op};
             inbuilts[m_op] = [this, m_op](vector<IlAtom> *pst) { cmp_2ops(pst, m_op); };
+        }
+        for (auto bool_op : {"and", "or"}) {
+            string m_op{bool_op};
+            inbuilts[m_op] = [this, m_op](vector<IlAtom> *pst) { bool_2ops(pst, m_op); };
         }
         inbuilts["ss"] = [&](vector<IlAtom> *pst) { stack_size(pst); };
         inbuilts["cs"] = [&](vector<IlAtom> *pst) { clear_stack(pst); };
