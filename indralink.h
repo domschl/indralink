@@ -604,7 +604,7 @@ class IndraLink {
         inbuilts["save"] = [&](vector<IlAtom> *pst) { save(pst); };
         inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
         inbuilts["eval"] = [&](vector<IlAtom> *pst) { string_eval(pst); };
-        flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break"};
+        flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
         def_words = {":", ";"};
     }
 
@@ -1043,6 +1043,7 @@ class IndraLink {
                         }
                         int while_address = while_level.back();
                         newFunc[pc].jump_address = while_address;
+                    } else if (ila.name == "return") {
                     }
                 }
             }
@@ -1157,6 +1158,8 @@ class IndraLink {
                     res.vb = false;
                     pst->push_back(res);
                     pc = ila.jump_address - 1;
+                } else if (ila.name == "return") {
+                    pc = newFunc.size();
                 }
                 break;
             case FUNC:
@@ -1222,10 +1225,14 @@ class IndraLink {
                     }
                     pst->push_back(res);
                 } else {
-                    res.t = ERROR;
-                    res.vs = "Undefined-symbol-reference: <" + ila.name + ">";
-                    pst->push_back(res);
-                    abort = true;
+                    if (is_func(ila.name)) {  // If a function gets defined during current command, it might have been parsed at unknown symbol
+                        eval(funcs[ila.name], pst);
+                    } else {
+                        res.t = ERROR;
+                        res.vs = "Undefined-symbol-reference: <" + ila.name + ">";
+                        pst->push_back(res);
+                        abort = true;
+                    }
                 }
                 break;
             case STORE_SYMBOL:
