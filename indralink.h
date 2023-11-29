@@ -39,6 +39,17 @@ enum ilAtomTypes {
     ERROR,
 };
 
+void replaceAll(string &str, const string &from, const string &to) {
+    // https://stackoverflow.com/questions/3418231/replace-part-of-a-string-with-another-string
+    if (from.empty())
+        return;
+    size_t start_pos = 0;
+    while ((start_pos = str.find(from, start_pos)) != string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length();
+    }
+}
+
 class IlAtom {
   public:
     ilAtomTypes t;
@@ -56,6 +67,7 @@ class IlAtom {
     }
 
     string str() {
+        string ir;
         switch (t) {
         case INT:
         case FLOAT:
@@ -63,7 +75,9 @@ class IlAtom {
             return vs;
             break;
         case STRING:
-            return '"' + vs + '"';
+            ir = '"' + vs + '"';
+            replaceAll(ir, "\n", "\\n");
+            return ir;
             break;
         case IFUNC:
         case FUNC:
@@ -439,7 +453,9 @@ class IndraLink {
                 vector<IlAtom> func = funcPair.second;
                 fprintf(fp, ": %s ", name.c_str());
                 for (auto il : func) {
-                    fprintf(fp, "%s ", il.str().c_str());
+                    string enc_line = il.str();
+                    // replaceAll(enc_line, "\\", "\\\\");
+                    fprintf(fp, "%s ", enc_line.c_str());
                 }
                 fprintf(fp, ";\n");
             }
@@ -466,14 +482,17 @@ class IndraLink {
             return;
         }
         char buf[129];
-        int no;
+        int nb;
         string cmd = "";
         FILE *fp = fopen(filedesc.vs.c_str(), "r");
         if (fp) {
-            no = fread(buf, 1, 128, fp);
-            buf[no] = 0;
-            cmd += buf;
+            while (!feof(fp)) {
+                nb = fread(buf, 1, 128, fp);
+                buf[nb] = 0;
+                cmd += buf;
+            }
         }
+        replaceAll(cmd, "\\n", "\n");
         vector<IlAtom> ps = parse(cmd);
         eval(ps, pst);
     }
@@ -503,24 +522,6 @@ class IndraLink {
         inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
         def_words = {":", ";"};
-    }
-
-    vector<string> split_old(const string &str, const string &delim) {
-        // XXX: needs proper white-space treatment, comment and string handling! DOES NOT WORK LIKE THIS!
-        vector<string> tokens;
-        size_t prev = 0, pos = 0;
-        do {
-            pos = str.find(delim, prev);
-            if (pos == string::npos) pos = str.length();
-            string token = str.substr(prev, pos - prev);
-            size_t posnl = token.find("\n");
-            if (posnl != string::npos) {
-                token = token.substr(0, posnl);
-            }
-            if (!token.empty()) tokens.push_back(token);
-            prev = pos + delim.length();
-        } while (pos < str.length() && prev < str.length());
-        return tokens;
     }
 
     bool is_white_space(char c) {
@@ -844,6 +845,7 @@ class IndraLink {
                     } else if (ila.vs == ";") {
                         is_def = false;
                         err = store_def(funcDef);
+                        funcDef.clear();
                         if (err != "") {
                             res.t = ERROR;
                             res.vs = err;
@@ -851,7 +853,6 @@ class IndraLink {
                             pst->push_back(res);
                             break;
                         }
-                        funcDef.clear();
                     }
                 } else {
                     funcDef.push_back(ila);
@@ -968,7 +969,7 @@ class IndraLink {
         // Eval:
         while (!abort && pc < newFunc.size()) {
             ++cycles;
-            if (cycles > 500) {
+            if (cycles > 2500) {
                 cout << endl
                      << "ABORT PROGRAM RUNTIME EXCEEDED" << endl;
                 abort = true;
