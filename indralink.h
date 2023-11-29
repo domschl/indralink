@@ -11,8 +11,9 @@ using std::map;
 using std::string;
 using std::vector;
 
-/* Code bits
-Integer square-root:
+/* Code bits and samples
+Integer square-root, from: https://en.wikipedia.org/wiki/Integer_square_root
+Takes integer and approximates best integer square root through iteration:
 : isqrt (n -- sqrt n) dup dup 2 / dup2 != while dup2 dup >sqrt / + 2 / dup sqrt < loop drop drop drop sqrt ;
 */
 
@@ -545,7 +546,7 @@ class IndraLink {
         inbuilts["save"] = [&](vector<IlAtom> *pst) { save(pst); };
         inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
         inbuilts["eval"] = [&](vector<IlAtom> *pst) { string_eval(pst); };
-        flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop"};
+        flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break"};
         def_words = {":", ";"};
     }
 
@@ -974,6 +975,16 @@ class IndraLink {
                         newFunc[pc].jump_address = while_address;
                         newFunc[while_address].jump_address = pc;
                         while_level.pop_back();
+                    } else if (ila.name == "break") {
+                        if (while_level.size() == 0) {
+                            res.t = ERROR;
+                            res.vs = "'break' without 'while'";
+                            abort = true;
+                            pst->push_back(res);
+                            break;
+                        }
+                        int while_address = while_level.back();
+                        newFunc[pc].jump_address = while_address;
                     }
                 }
             }
@@ -1082,6 +1093,11 @@ class IndraLink {
                         }
                     }
                 } else if (ila.name == "loop") {
+                    pc = ila.jump_address - 1;
+                } else if (ila.name == "break") {
+                    res.t = BOOL;
+                    res.vb = false;
+                    pst->push_back(res);
                     pc = ila.jump_address - 1;
                 }
                 break;
