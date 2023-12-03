@@ -476,7 +476,48 @@ class IndraLink {
     }
 
     void drop(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow drop";
+            pst->push_back(err);
+            return;
+        }
         pst->pop_back();
+    }
+
+    void range(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow range";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2;
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t != INT || r2.t != INT) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Range required 2 INT args";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r;
+        r.t = INT_ARRAY;
+        if (r1.vi <= r2.vi) {
+            for (auto i = r1.vi; i < r2.vi; i++)
+                r.vai.push_back(i);
+        } else {
+            for (auto i = r1.vi; i > r2.vi; i--)
+                r.vai.push_back(i);
+        }
+        pst->push_back(r);
     }
 
     void print(vector<IlAtom> *pst) {
@@ -649,6 +690,7 @@ class IndraLink {
         inbuilts["save"] = [&](vector<IlAtom> *pst) { save(pst); };
         inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
         inbuilts["eval"] = [&](vector<IlAtom> *pst) { string_eval(pst); };
+        inbuilts["range"] = [&](vector<IlAtom> *pst) { range(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
         def_words = {":", ";"};
     }
@@ -1099,6 +1141,7 @@ class IndraLink {
                 ila = newFunc[pc];
                 if (ila.t == FLOW_CONTROL) {
                     if (ila.name == "for") {
+                        /*
                         if (pc < 1) {
                             res.t = ERROR;
                             res.vs = "Not enough stack data before 'for' instruction (1 required)";
@@ -1106,6 +1149,7 @@ class IndraLink {
                             pst->push_back(res);
                             break;
                         }
+                        */
                         for_level.push_back(pc);
                         last_loop = "for";
                     } else if (ila.name == "next") {
@@ -1121,7 +1165,7 @@ class IndraLink {
                         newFunc[for_address].jump_address = pc;
                         for_level.pop_back();
                     } else if (ila.name == "if") {
-                        if (pc < 1) {
+                        if (pst->size() < 1) {
                             res.t = ERROR;
                             res.vs = "Not enough stack data before 'if' instruction (1 required)";
                             abort = true;
@@ -1158,6 +1202,7 @@ class IndraLink {
                         }
                         if_level.pop_back();
                     } else if (ila.name == "while") {
+                        /*
                         if (pc < 1) {
                             res.t = ERROR;
                             res.vs = "Not enough stack data before 'while' instruction (1 required)";
@@ -1165,6 +1210,7 @@ class IndraLink {
                             pst->push_back(res);
                             break;
                         }
+                        */
                         while_level.push_back(pc);
                         last_loop = "while";
                     } else if (ila.name == "loop") {
