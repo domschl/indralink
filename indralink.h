@@ -1068,6 +1068,43 @@ class IndraLink {
         }
     }
 
+    void string_substring(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 3) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow string_substring";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2, r3;
+        r3 = pst->back();
+        pst->pop_back();
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == STRING && r2.t == INT && r3.t == INT) {
+            IlAtom r;
+            r.t = STRING;
+            if (r2.vi < 0 || r3.vi < 0 || r2.vi + r3.vi > r1.vs.length()) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "string_substring index out-of-range";
+                pst->push_back(err);
+                return;
+            }
+            r.vs = r1.vs.substr(r2.vi, r3.vi);
+            pst->push_back(r);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "string_substring requires STRING, INT, INT";
+            pst->push_back(err);
+            return;
+        }
+    }
+
     void print(vector<IlAtom> *pst) {
         IlAtom res = pst->back();
         if (res.t == STRING)
@@ -1249,6 +1286,7 @@ class IndraLink {
         inbuilts["bool"] = [&](vector<IlAtom> *pst) { to_bool(pst); };
         inbuilts["string"] = [&](vector<IlAtom> *pst) { to_string(pst); };
         inbuilts["split"] = [&](vector<IlAtom> *pst) { string_split(pst); };
+        inbuilts["substring"] = [&](vector<IlAtom> *pst) { string_substring(pst); };
         inbuilts["sum"] = [&](vector<IlAtom> *pst) { array_sum(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
         def_words = {":", ";"};
