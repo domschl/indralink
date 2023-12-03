@@ -65,7 +65,7 @@ class IlAtom {
     bool vb;
     vector<int> shape;
     vector<int> vai;
-    vector<float> vaf;
+    vector<double> vaf;
     vector<string> vas;
     vector<bool> vab;
     string name;
@@ -786,6 +786,245 @@ class IndraLink {
         return;
     }
 
+    void to_int(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow to_int";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT) {
+            res.t = INT;
+            res.vi = {r1.vi};
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == FLOAT) {
+            res.t = INT;
+            res.vi = (int)r1.vf;
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == BOOL) {
+            res.t = INT;
+            if (r1.t)
+                res.vi = 1;
+            else
+                res.vi = 0;
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == STRING) {
+            if (is_int(r1.vs)) {
+                res.t = INT;
+                res.vi = atoi(r1.vs.c_str());
+            } else {
+                res.t = ERROR;
+                res.vs = "Can't convert: " + r1.vs = " to int";
+            }
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "to_int requires: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void to_float(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow to_float";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT) {
+            res.t = FLOAT;
+            res.vf = (double)res.vi;
+            res.vs = std::to_string(res.vf);
+            pst->push_back(res);
+        } else if (r1.t == FLOAT) {
+            res.t = FLOAT;
+            res.vf = r1.vf;
+            res.vs = std::to_string(res.vf);
+            pst->push_back(res);
+        } else if (r1.t == BOOL) {
+            res.t = FLOAT;
+            if (r1.t)
+                res.vf = 1.0;
+            else
+                res.vf = 0.0;
+            res.vs = std::to_string(res.vf);
+            pst->push_back(res);
+        } else if (r1.t == STRING) {
+            if (is_float(r1.vs)) {
+                res.t = FLOAT;
+                res.vf = atof(r1.vs.c_str());
+            } else {
+                res.t = ERROR;
+                res.vs = "Can't convert: " + r1.vs = " to float";
+            }
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "to_float requires: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void to_bool(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow to_bool";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT) {
+            res.t = BOOL;
+            if (r1.vi) {
+                res.vb = true;
+                res.vs = true;
+            } else {
+                res.vb = false;
+                res.vs = "false";
+            }
+            pst->push_back(res);
+        } else if (r1.t == FLOAT) {
+            res.t = BOOL;
+            if (r1.vf != 0.0) {
+                res.vb = true;
+                res.vs = "true";
+            } else {
+                res.vb = false;
+                res.vs = "false";
+            }
+            pst->push_back(res);
+        } else if (r1.t == BOOL) {
+            res.t = BOOL;
+            res.vb = r1.vb;
+            if (r1.vb) {
+                res.vs = "true";
+            } else {
+                res.vs = "false";
+            }
+            pst->push_back(res);
+        } else if (r1.t == STRING) {
+            res.t = BOOL;
+            if (r1.vs == "true") {
+                res.vb = true;
+                res.vs = "true";
+            } else {
+                res.vb = false;
+                res.vs = "false";
+            }
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "to_bool requires: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void to_string(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow to_string";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT) {
+            res.t = STRING;
+            res.vs = std::to_string(r1.vi);
+            pst->push_back(res);
+        } else if (r1.t == FLOAT) {
+            res.t = STRING;
+            res.vs = std::to_string(r1.vf);
+            pst->push_back(res);
+        } else if (r1.t == BOOL) {
+            res.t = STRING;
+            if (r1.vb) {
+                res.vs = "true";
+            } else {
+                res.vs = "false";
+            }
+            pst->push_back(res);
+        } else if (r1.t == STRING) {
+            res.t = STRING;
+            res.vs = r1.vs;
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "to_string requires: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void to_array(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow to_array";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT) {
+            res.t = INT_ARRAY;
+            res.vai = {r1.vi};
+            pst->push_back(res);
+        } else if (r1.t == FLOAT) {
+            res.t = FLOAT_ARRAY;
+            res.vaf = {r1.vf};
+            pst->push_back(res);
+        } else if (r1.t == BOOL) {
+            res.t = BOOL_ARRAY;
+            res.vab = {r1.vb};
+            pst->push_back(res);
+        } else if (r1.t == STRING) {
+            res.t = STRING_ARRAY;
+            res.vas = {r1.vs};
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "to_array requires: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
     void string_split(vector<IlAtom> *pst) {
         size_t l = pst->size();
         if (l < 2) {
@@ -1004,6 +1243,11 @@ class IndraLink {
         inbuilts["append"] = [&](vector<IlAtom> *pst) { array_append(pst); };
         inbuilts["update"] = [&](vector<IlAtom> *pst) { array_update(pst); };
         inbuilts["erase"] = [&](vector<IlAtom> *pst) { array_erase(pst); };
+        inbuilts["array"] = [&](vector<IlAtom> *pst) { to_array(pst); };
+        inbuilts["int"] = [&](vector<IlAtom> *pst) { to_int(pst); };
+        inbuilts["float"] = [&](vector<IlAtom> *pst) { to_float(pst); };
+        inbuilts["bool"] = [&](vector<IlAtom> *pst) { to_bool(pst); };
+        inbuilts["string"] = [&](vector<IlAtom> *pst) { to_string(pst); };
         inbuilts["split"] = [&](vector<IlAtom> *pst) { string_split(pst); };
         inbuilts["sum"] = [&](vector<IlAtom> *pst) { array_sum(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
