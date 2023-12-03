@@ -520,6 +520,206 @@ class IndraLink {
         pst->push_back(r);
     }
 
+    void array_append(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow append";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2;
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY && r2.t == INT) {
+            r1.vai.push_back(r2.vi);
+            pst->push_back(r1);
+        } else if (r1.t == FLOAT_ARRAY && r2.t == FLOAT) {
+            r1.vaf.push_back(r2.vf);
+            pst->push_back(r1);
+        } else if (r1.t == BOOL_ARRAY && r2.t == BOOL) {
+            r1.vab.push_back(r2.vb);
+            pst->push_back(r1);
+        } else if (r1.t == STRING_ARRAY && r2.t == STRING) {
+            r1.vas.push_back(r2.vs);
+            pst->push_back(r1);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Append requires array and element of same type: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void array_remove(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow remove";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2;
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vai.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-remove";
+                pst->push_back(err);
+                return;
+            }
+            r1.vai.erase(r1.vai.begin() + r2.vi);
+            pst->push_back(r1);
+        } else if (r1.t == FLOAT_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vaf.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-remove";
+                pst->push_back(err);
+                return;
+            }
+            r1.vaf.erase(r1.vaf.begin() + r2.vi);
+            pst->push_back(r1);
+        } else if (r1.t == BOOL_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vab.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-remove";
+                pst->push_back(err);
+                return;
+            }
+            r1.vab.erase(r1.vab.begin() + r2.vi);
+            pst->push_back(r1);
+        } else if (r1.t == STRING_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vas.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-remove";
+                pst->push_back(err);
+                return;
+            }
+            r1.vas.erase(r1.vas.begin() + r2.vi);
+            pst->push_back(r1);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Remove requires array of type: INT, FLOAT, STRING, or BOOL and an Index of type INT";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void array_erase(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow remove";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY) {
+            r1.vai.clear();
+            pst->push_back(r1);
+        } else if (r1.t == FLOAT_ARRAY) {
+            r1.vaf.clear();
+            pst->push_back(r1);
+        } else if (r1.t == BOOL_ARRAY) {
+            r1.vab.clear();
+            pst->push_back(r1);
+        } else if (r1.t == STRING_ARRAY) {
+            r1.vas.clear();
+            pst->push_back(r1);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Erase requires array of type: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
+    void array_update(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 3) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow update";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2, r3;
+        r3 = pst->back();
+        pst->pop_back();
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY && r2.t == INT && r3.t == INT) {
+            if (r2.vi >= r1.vai.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-update";
+                pst->push_back(err);
+                return;
+            }
+            r1.vai[r2.vi] = r3.vi;
+            pst->push_back(r1);
+        } else if (r1.t == FLOAT_ARRAY && r2.t == INT && r3.t == FLOAT) {
+            if (r2.vi >= r1.vaf.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-update";
+                pst->push_back(err);
+                return;
+            }
+            r1.vaf[r2.vi] = r3.vf;
+            pst->push_back(r1);
+        } else if (r1.t == BOOL_ARRAY && r2.t == INT && r3.t == BOOL) {
+            if (r2.vi >= r1.vab.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-update";
+                pst->push_back(err);
+                return;
+            }
+            r1.vab[r2.vi] = r3.vb;
+            pst->push_back(r1);
+        } else if (r1.t == STRING_ARRAY && r2.t == INT && r3.t == STRING) {
+            if (r2.vi >= r1.vas.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-update";
+                pst->push_back(err);
+                return;
+            }
+            r1.vas[r2.vi] = r3.vs;
+            pst->push_back(r1);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Update requires array of type: INT, FLOAT, STRING, or BOOL and an Index of type INT, and a Value of same type as the array.";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
     void print(vector<IlAtom> *pst) {
         IlAtom res = pst->back();
         if (res.t == STRING)
@@ -691,6 +891,11 @@ class IndraLink {
         inbuilts["load"] = [&](vector<IlAtom> *pst) { load(pst); };
         inbuilts["eval"] = [&](vector<IlAtom> *pst) { string_eval(pst); };
         inbuilts["range"] = [&](vector<IlAtom> *pst) { range(pst); };
+        inbuilts["remove"] = [&](vector<IlAtom> *pst) { array_remove(pst); };
+        inbuilts["append"] = [&](vector<IlAtom> *pst) { array_append(pst); };
+        inbuilts["update"] = [&](vector<IlAtom> *pst) { array_update(pst); };
+        inbuilts["erase"] = [&](vector<IlAtom> *pst) { array_erase(pst); };
+        // inbuilts["split"] = [&](vector<IlAtom> *pst) { string_split(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
         def_words = {":", ";"};
     }
