@@ -176,7 +176,7 @@ void repl(std::string &prompt, std::string &prompt2) {
         auto start = std::chrono::steady_clock::now();
         il.eval(ps, &st);
         std::cout << std::endl;
-        std::cout << "Stack: [";
+        std::cout << "Stack: |";
         bool first = true;
         for (auto s : st) {
             if (first)
@@ -185,7 +185,7 @@ void repl(std::string &prompt, std::string &prompt2) {
                 std::cout << " ";
             std::cout << s.str();
         }
-        std::cout << "]" << std::endl;
+        std::cout << "|" << std::endl;
 
         auto diff = std::chrono::steady_clock::now() - start;
         std::cout << "Eval dt: "

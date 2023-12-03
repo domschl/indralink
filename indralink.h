@@ -23,10 +23,15 @@ static string infSymbol = "∞";
 static string fnSymbol = "⒡";
 
 enum ilAtomTypes {
+    UNDEFINED = 0,
     INT = 1,
     FLOAT,
     BOOL,
     STRING,
+    INT_ARRAY,
+    FLOAT_ARRAY,
+    BOOL_ARRAY,
+    STRING_ARRAY,
     SYMBOL,
     COMMENT,
     DEF_WORD,
@@ -58,6 +63,11 @@ class IlAtom {
     double vf;
     string vs;
     bool vb;
+    vector<int> shape;
+    vector<int> vai;
+    vector<float> vaf;
+    vector<string> vas;
+    vector<bool> vab;
     string name;
     std::function<void(vector<IlAtom> *)> vif;
     int jump_address;
@@ -78,6 +88,41 @@ class IlAtom {
         case STRING:
             ir = '"' + vs + '"';
             replaceAll(ir, "\n", "\\n");
+            return ir;
+            break;
+        case INT_ARRAY:
+            ir = "[ ";
+            for (auto i : vai) {
+                ir += std::to_string(i) + " ";
+            }
+            ir += "]";
+            return ir;
+            break;
+        case FLOAT_ARRAY:
+            ir = "[ ";
+            for (auto f : vaf) {
+                ir += std::to_string(f) + " ";
+            }
+            ir += "]";
+            return ir;
+            break;
+        case BOOL_ARRAY:
+            ir = "[ ";
+            for (auto b : vab) {
+                if (b)
+                    ir += "true ";
+                else
+                    ir += "false ";
+            }
+            ir += "]";
+            return ir;
+            break;
+        case STRING_ARRAY:
+            ir = "[ ";
+            for (auto s : vas) {
+                ir += '"' + s + '"' + " ";
+            }
+            ir += "]";
             return ir;
             break;
         case IFUNC:
@@ -613,8 +658,7 @@ class IndraLink {
         return false;
     }
 
-    vector<string> split(const string &str, const string &delim) {
-        // XXX: needs proper white-space treatment, comment and string handling! DOES NOT WORK LIKE THIS!
+    vector<string> split(const string &str) {
         vector<string> tokens;
         string tok;
         enum SplitState { START,
@@ -623,6 +667,7 @@ class IndraLink {
                           STRING,
                           STRING_ESC,
                           // STRING_END,
+                          ARRAY,
                           COMMENT1,
                           COMMENT2 };
         SplitState state = START;
@@ -647,6 +692,10 @@ class IndraLink {
                     state = COMMENT2;
                     tok = c;
                     continue;
+                case '[':
+                    state = ARRAY;
+                    tok = c;
+                    continue;
                 default:
                     state = TOKEN;
                     tok = c;
@@ -664,8 +713,19 @@ class IndraLink {
                     tok += c;
                     continue;
                 }
+            case ARRAY:
+                if (c == ']') {
+                    tok += c;
+                    tokens.push_back(tok);
+                    tok = "";
+                    state = WHITE_SPACE;
+                    continue;
+                } else {
+                    tok += c;
+                    continue;
+                }
             case STRING_ESC:
-                if (c == 'n') {
+                if (c == 'n') {  // XXX other escs?
                     string sc = {10};
                     tok += sc;
                 } else {
@@ -758,6 +818,27 @@ class IndraLink {
             return false;
     }
 
+    bool is_bool(string token) {
+        if (token == "false" || token == "true")
+            return true;
+        else
+            return false;
+    }
+
+    bool is_string(string token) {
+        if (token.length() > 1 && token[0] == '"' && token[token.length() - 1] == '"')
+            return true;
+        else
+            return false;
+    }
+
+    bool is_array(string token) {
+        if (token.length() > 1 && token[0] == '[' && token[token.length() - 1] == ']')
+            return true;
+        else
+            return false;
+    }
+
     IlAtom parse_tok(string token) {
         IlAtom m;
         m.t = ERROR;
@@ -777,16 +858,78 @@ class IndraLink {
             m.t = FLOAT;
             m.vf = atof(token.c_str());
             m.vs = token;
-        } else if (token == "false" || token == "true") {
+        } else if (is_bool(token)) {
             m.t = BOOL;
             m.vs = token;
             if (token == "false")
                 m.vb = false;
             else
                 m.vb = true;
-        } else if (token.length() > 1 && token[0] == '"' && token[token.length() - 1] == '"') {
+        } else if (is_string(token)) {
             m.t = STRING;
             m.vs = token.substr(1, token.length() - 2);
+        } else if (is_array(token)) {
+            string arr = token.substr(1, token.length() - 2);
+            vector<string> arr_els = split(arr);
+            ilAtomTypes t = UNDEFINED;
+            ilAtomTypes ti;
+            for (auto el : arr_els) {
+                ti = UNDEFINED;
+                if (is_comment(el)) continue;
+                if (is_int(el))
+                    ti = INT;
+                else if (is_float(el))
+                    ti = FLOAT;
+                else if (is_bool(el))
+                    ti = BOOL;
+                else if (is_string(el))
+                    ti = STRING;
+                if (ti == UNDEFINED) {
+                    if (symbols.find(el) != symbols.end()) {
+                        IlAtom sm = symbols[el];
+                        if (sm.t == INT || sm.t == FLOAT || sm.t == BOOL || sm.t == STRING) {
+                            ti = sm.t;
+                            el = sm.str();
+                        }
+                    }
+                }
+                if (t == UNDEFINED && ti != UNDEFINED) t = ti;
+                if (t != ti || t == UNDEFINED) {
+                    m.t = ERROR;
+                    m.vs = "Bad-array-el: " + el;
+                    break;
+                }
+                switch (t) {
+                case INT:
+                    m.vai.push_back(atoi(el.c_str()));
+                    m.t = INT_ARRAY;
+                    break;
+                case FLOAT:
+                    m.vaf.push_back(atof(el.c_str()));
+                    m.t = FLOAT_ARRAY;
+                    break;
+                case BOOL:
+                    if (el == "true")
+                        m.vab.push_back(true);
+                    else
+                        m.vab.push_back(false);
+                    m.t = BOOL_ARRAY;
+                    break;
+                case STRING:
+                    if (el.length() > 1)
+                        el = el.substr(1, el.length() - 2);
+                    else
+                        el = "INV_STR";
+                    m.vas.push_back(el);
+                    m.t = STRING_ARRAY;
+                    break;
+                default:
+                    m.t = ERROR;
+                    m.vs = "BAD_Array_state_type";
+                    t = ERROR;
+                    break;
+                }
+            }
         } else if (is_flow_control(token)) {
             m.t = FLOW_CONTROL;
             m.vs = token;
@@ -825,7 +968,7 @@ class IndraLink {
 
     vector<IlAtom> parse(string &input) {
         vector<IlAtom> ps;
-        vector<string> tokens = split(input, " ");
+        vector<string> tokens = split(input);
         for (auto tok : tokens) {
             ps.push_back(parse_tok(tok));
         }
@@ -901,6 +1044,7 @@ class IndraLink {
         string err;
         vector<int> for_level, else_level, while_level, if_level;
         int cycles = 0;
+        string last_loop = "";
         // Exctract function defintions:
         for (int pc = 0; pc < func.size(); pc++) {
             ila = func[pc];
@@ -955,14 +1099,15 @@ class IndraLink {
                 ila = newFunc[pc];
                 if (ila.t == FLOW_CONTROL) {
                     if (ila.name == "for") {
-                        if (pc < 3) {
+                        if (pc < 1) {
                             res.t = ERROR;
-                            res.vs = "Not enough stack data before 'for' instruction (3 required)";
+                            res.vs = "Not enough stack data before 'for' instruction (1 required)";
                             abort = true;
                             pst->push_back(res);
                             break;
                         }
                         for_level.push_back(pc);
+                        last_loop = "for";
                     } else if (ila.name == "next") {
                         if (for_level.size() == 0) {
                             res.t = ERROR;
@@ -1021,6 +1166,7 @@ class IndraLink {
                             break;
                         }
                         while_level.push_back(pc);
+                        last_loop = "while";
                     } else if (ila.name == "loop") {
                         if (while_level.size() == 0) {
                             res.t = ERROR;
@@ -1034,15 +1180,33 @@ class IndraLink {
                         newFunc[while_address].jump_address = pc;
                         while_level.pop_back();
                     } else if (ila.name == "break") {
-                        if (while_level.size() == 0) {
+                        if (last_loop == "while") {
+                            if (while_level.size() == 0) {
+                                res.t = ERROR;
+                                res.vs = "'break' without 'while'";
+                                abort = true;
+                                pst->push_back(res);
+                                break;
+                            }
+                            int while_address = while_level.back();
+                            newFunc[pc].jump_address = while_address;
+                        } else if (last_loop == "for") {
+                            if (for_level.size() == 0) {
+                                res.t = ERROR;
+                                res.vs = "'break' without 'for'";
+                                abort = true;
+                                pst->push_back(res);
+                                break;
+                            }
+                            int for_address = for_level.back();
+                            newFunc[pc].jump_address = for_address;
+                        } else {
                             res.t = ERROR;
-                            res.vs = "'break' without 'while'";
+                            res.vs = "'break' without 'for' or 'while'";
                             abort = true;
                             pst->push_back(res);
                             break;
                         }
-                        int while_address = while_level.back();
-                        newFunc[pc].jump_address = while_address;
                     } else if (ila.name == "return") {
                     }
                 }
@@ -1062,6 +1226,7 @@ class IndraLink {
             }
         }
         // Eval:
+        last_loop = "";
         while (!abort && pc < newFunc.size()) {
             ++cycles;
             if (cycles > 2500) {
@@ -1078,6 +1243,16 @@ class IndraLink {
             case BOOL:
             case STRING:
                 pst->push_back(ila);
+                break;
+            case INT_ARRAY:
+            case FLOAT_ARRAY:
+            case BOOL_ARRAY:
+            case STRING_ARRAY:
+                if (ila.t == ERROR) {
+                    abort = true;
+                } else {
+                    pst->push_back(ila);
+                }
                 break;
             case IFUNC:
                 ila.vif(pst);
@@ -1128,6 +1303,7 @@ class IndraLink {
                         pst->push_back(res);
                         abort = true;
                     } else {
+                        last_loop = "while";
                         IlAtom b = pst->back();
                         pst->pop_back();
                         if (b.t != BOOL && b.t != INT) {
@@ -1153,10 +1329,94 @@ class IndraLink {
                     }
                 } else if (ila.name == "loop") {
                     pc = ila.jump_address - 1;
+                } else if (ila.name == "for") {
+                    if (pst->size() == 0) {
+                        res.t = ERROR;
+                        res.vs = "Stack-underflow-on-for";
+                        pst->push_back(res);
+                        abort = true;
+                    } else {
+                        IlAtom b = pst->back();
+                        pst->pop_back();
+                        if (b.t != INT_ARRAY && b.t != STRING_ARRAY && b.t != FLOAT_ARRAY && b.t != BOOL_ARRAY) {
+                            res.t = ERROR;
+                            res.vs = "'for' requires an INT, STRING, FLOAT, or BOOL array stack";
+                            pst->push_back(res);
+                            abort = true;
+                        } else {
+                            last_loop = "for";
+                            switch (b.t) {
+                            case INT_ARRAY:
+                                if (b.vai.size() == 0) {
+                                    pc = ila.jump_address;
+                                } else {
+                                    IlAtom fi;
+                                    fi.t = INT;
+                                    fi.vi = b.vai[0];
+                                    fi.vs = std::to_string(fi.vi);
+                                    b.vai.erase(b.vai.begin());
+                                    pst->push_back(b);
+                                    pst->push_back(fi);
+                                }
+                                break;
+                            case FLOAT_ARRAY:
+                                if (b.vaf.size() == 0) {
+                                    pc = ila.jump_address;
+                                } else {
+                                    IlAtom fi;
+                                    fi.t = FLOAT;
+                                    fi.vf = b.vaf[0];
+                                    fi.vs = std::to_string(fi.vf);
+                                    b.vaf.erase(b.vaf.begin());
+                                    pst->push_back(b);
+                                    pst->push_back(fi);
+                                }
+                                break;
+                            case BOOL_ARRAY:
+                                if (b.vab.size() == 0) {
+                                    pc = ila.jump_address;
+                                } else {
+                                    IlAtom fi;
+                                    fi.t = BOOL;
+                                    fi.vb = b.vab[0];
+                                    if (fi.vb)
+                                        fi.vs = "true";
+                                    else
+                                        fi.vs = "false";
+                                    b.vab.erase(b.vab.begin());
+                                    pst->push_back(b);
+                                    pst->push_back(fi);
+                                }
+                                break;
+                            case STRING_ARRAY:
+                                if (b.vas.size() == 0) {
+                                    pc = ila.jump_address;
+                                } else {
+                                    IlAtom fi;
+                                    fi.t = STRING;
+                                    fi.vs = b.vas[0];
+                                    b.vas.erase(b.vas.begin());
+                                    pst->push_back(b);
+                                    pst->push_back(fi);
+                                }
+                                break;
+                            default:
+                                res.t = ERROR;
+                                res.vs = "'for' encounter illegal array type";
+                                pst->push_back(res);
+                                abort = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if (ila.name == "next") {
+                    pc = ila.jump_address - 1;
                 } else if (ila.name == "break") {
-                    res.t = BOOL;
-                    res.vb = false;
-                    pst->push_back(res);
+                    if (last_loop == "while") {
+                        res.t = BOOL;
+                        res.vb = false;
+                        pst->push_back(res);
+                    }
                     pc = ila.jump_address - 1;
                 } else if (ila.name == "return") {
                     pc = newFunc.size();
@@ -1217,6 +1477,11 @@ class IndraLink {
                         res.t = STRING;
                         res.vs = sym.vs;
                         break;
+                    case INT_ARRAY:
+                        res.t = INT_ARRAY;
+                        res.vai = sym.vai;
+                        res.vs = sym.str();
+                        break;
                     default:
                         res.t = ERROR;
                         res.vs = "Illegal-Symbol-content-type";
@@ -1252,7 +1517,7 @@ class IndraLink {
                 }
                 res = pst->back();
                 pst->pop_back();
-                if (res.t != INT && res.t != FLOAT && res.t && BOOL && res.t != STRING) {
+                if (res.t != INT && res.t != FLOAT && res.t && BOOL && res.t != STRING && res.t != INT_ARRAY && res.t != FLOAT_ARRAY && res.t != BOOL_ARRAY && res.t != STRING_ARRAY) {
                     res.t = ERROR;
                     res.vs = "Symdef-invalid-type";
                     pst->push_back(res);
