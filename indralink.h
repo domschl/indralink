@@ -734,6 +734,92 @@ class IndraLink {
         return;
     }
 
+    void array_index(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow index";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2, res;
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vai.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-index";
+                pst->push_back(err);
+                return;
+            }
+            res.t = INT;
+            res.vi = r1.vai[r2.vi];
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == FLOAT_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vaf.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-index";
+                pst->push_back(err);
+                return;
+            }
+            res.t = FLOAT;
+            res.vi = r1.vaf[r2.vi];
+            res.vs = std::to_string(res.vf);
+            pst->push_back(res);
+        } else if (r1.t == BOOL_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vab.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-index";
+                pst->push_back(err);
+                return;
+            }
+            res.t = BOOL;
+            res.vb = r1.vab[r2.vi];
+            if (res.t)
+                res.vs = "true";
+            else
+                res.vs = "false";
+            pst->push_back(res);
+        } else if (r1.t == STRING_ARRAY && r2.t == INT) {
+            if (r2.vi >= r1.vas.size() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-index";
+                pst->push_back(err);
+                return;
+            }
+            res.t = STRING;
+            res.vs = r1.vas[r2.vi];
+            pst->push_back(res);
+        } else if (r1.t == STRING && r2.t == INT) {
+            if (r2.vi >= r1.vs.length() || r2.vi < 0) {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Index-out-of-range-on-string-index";
+                pst->push_back(err);
+                return;
+            }
+            res.t = STRING;
+            string cs{r1.vs[r2.vi]};
+            res.vs = cs;
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Update requires array of type: INT, FLOAT, STRING, or BOOL and an Index of type INT, and a Value of same type as the array.";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
     void array_sum(vector<IlAtom> *pst) {
         size_t l = pst->size();
         if (l < 1) {
@@ -786,6 +872,52 @@ class IndraLink {
         return;
     }
 
+    void array_or_string_len(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow sum";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY) {
+            res.t = INT;
+            res.vi = r1.vai.size();
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == FLOAT_ARRAY) {
+            res.t = INT;
+            res.vi = r1.vaf.size();
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == BOOL_ARRAY) {
+            res.t = INT;
+            res.vi = r1.vab.size();
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == STRING_ARRAY) {
+            res.t = INT;
+            res.vi = r1.vas.size();
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == STRING) {
+            res.t = INT;
+            res.vi = r1.vs.length();
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Sum requires array of type: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
     void to_int(vector<IlAtom> *pst) {
         size_t l = pst->size();
         if (l < 1) {
@@ -1279,6 +1411,8 @@ class IndraLink {
         inbuilts["remove"] = [&](vector<IlAtom> *pst) { array_remove(pst); };
         inbuilts["append"] = [&](vector<IlAtom> *pst) { array_append(pst); };
         inbuilts["update"] = [&](vector<IlAtom> *pst) { array_update(pst); };
+        inbuilts["index"] = [&](vector<IlAtom> *pst) { array_index(pst); };
+        inbuilts["len"] = [&](vector<IlAtom> *pst) { array_or_string_len(pst); };
         inbuilts["erase"] = [&](vector<IlAtom> *pst) { array_erase(pst); };
         inbuilts["array"] = [&](vector<IlAtom> *pst) { to_array(pst); };
         inbuilts["int"] = [&](vector<IlAtom> *pst) { to_int(pst); };
