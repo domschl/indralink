@@ -170,11 +170,24 @@ class IndraLink {
         pst->pop_back();
         t2 = op2.t;
         t1 = op1.t;
+
         if ((t1 != INT && t1 != FLOAT) || (t2 != INT && t2 != FLOAT)) {
-            IlAtom err;
-            err.t = ERROR;
-            err.vs = "Math-" + ops2 + "-Wrong-Type-Operands";
-            pst->push_back(err);
+            if (t1 == STRING && t2 == STRING && ops2 == "+") {
+                res.t = STRING;
+                res.vs = op1.vs + op2.vs;
+            } else if (t1 == STRING && t2 == INT && op2.vi >= 0 && ops2 == "*") {
+                res.t = STRING;
+                res.vs = "";
+                for (auto i = 0; i < op2.vi; i++)
+                    res.vs += op1.vs;
+            } else {
+                IlAtom err;
+                err.t = ERROR;
+                err.vs = "Math-" + ops2 + "-Wrong-Type-Operands";
+                pst->push_back(err);
+                return;
+            }
+            pst->push_back(res);
             return;
         }
 
@@ -253,7 +266,8 @@ class IndraLink {
         pst->push_back(res);
     }
 
-    void cmp_2ops(vector<IlAtom> *pst, string ops2) {
+    void
+    cmp_2ops(vector<IlAtom> *pst, string ops2) {
         size_t l = pst->size();
         if (l < 2) {
             IlAtom err;
@@ -720,6 +734,58 @@ class IndraLink {
         return;
     }
 
+    void array_sum(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 1) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow sum";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, res;
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == INT_ARRAY) {
+            res.t = INT;
+            res.vi = 0;
+            for (auto n : r1.vai)
+                res.vi += n;
+            res.vs = std::to_string(res.vi);
+            pst->push_back(res);
+        } else if (r1.t == FLOAT_ARRAY) {
+            res.t = FLOAT;
+            res.vf = 0.0;
+            for (auto f : r1.vaf)
+                res.vf += f;
+            res.vs = std::to_string(res.vf);
+            pst->push_back(res);
+        } else if (r1.t == BOOL_ARRAY) {
+            res.t = BOOL;
+            res.vb = true;
+            for (auto b : r1.vab)
+                if (!b) res.vb = false;
+            if (res.vb)
+                res.vs = "true";
+            else
+                res.vs = "false";
+            pst->push_back(res);
+        } else if (r1.t == STRING_ARRAY) {
+            res.t = STRING;
+            res.vs = "";
+            for (auto s : r1.vas)
+                res.vs += s;
+            pst->push_back(res);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Sum requires array of type: INT, FLOAT, STRING, or BOOL";
+            pst->push_back(err);
+            return;
+        }
+        return;
+    }
+
     void string_split(vector<IlAtom> *pst) {
         size_t l = pst->size();
         if (l < 2) {
@@ -939,6 +1005,7 @@ class IndraLink {
         inbuilts["update"] = [&](vector<IlAtom> *pst) { array_update(pst); };
         inbuilts["erase"] = [&](vector<IlAtom> *pst) { array_erase(pst); };
         inbuilts["split"] = [&](vector<IlAtom> *pst) { string_split(pst); };
+        inbuilts["sum"] = [&](vector<IlAtom> *pst) { array_sum(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
         def_words = {":", ";"};
     }
