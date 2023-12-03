@@ -720,6 +720,49 @@ class IndraLink {
         return;
     }
 
+    void string_split(vector<IlAtom> *pst) {
+        size_t l = pst->size();
+        if (l < 2) {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "Stack-Underflow string_split";
+            pst->push_back(err);
+            return;
+        }
+        IlAtom r1, r2;
+        r2 = pst->back();
+        pst->pop_back();
+        r1 = pst->back();
+        pst->pop_back();
+        if (r1.t == STRING && r2.t == STRING) {
+            string s = r1.vs;
+            string sp = r2.vs;
+            IlAtom r;
+            r.t = STRING_ARRAY;
+            if (sp == "") {
+                for (auto c : s) {
+                    string cs{c};
+                    r.vas.push_back(cs);
+                }
+            } else {
+                size_t p = s.find(sp);
+                while (p != string::npos) {
+                    r.vas.push_back(s.substr(0, p));
+                    s = s.substr(p + sp.length());
+                    p = s.find(sp);
+                }
+                if (s.length() > 0) r.vas.push_back(s);
+            }
+            pst->push_back(r);
+        } else {
+            IlAtom err;
+            err.t = ERROR;
+            err.vs = "string_split requires two STRING vars";
+            pst->push_back(err);
+            return;
+        }
+    }
+
     void print(vector<IlAtom> *pst) {
         IlAtom res = pst->back();
         if (res.t == STRING)
@@ -895,7 +938,7 @@ class IndraLink {
         inbuilts["append"] = [&](vector<IlAtom> *pst) { array_append(pst); };
         inbuilts["update"] = [&](vector<IlAtom> *pst) { array_update(pst); };
         inbuilts["erase"] = [&](vector<IlAtom> *pst) { array_erase(pst); };
-        // inbuilts["split"] = [&](vector<IlAtom> *pst) { string_split(pst); };
+        inbuilts["split"] = [&](vector<IlAtom> *pst) { string_split(pst); };
         flow_control_words = {"for", "next", "if", "else", "endif", "while", "loop", "break", "return"};
         def_words = {":", ";"};
     }
