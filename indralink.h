@@ -525,10 +525,10 @@ class IndraLink {
         IlAtom r;
         r.t = INT_ARRAY;
         if (r1.vi <= r2.vi) {
-            for (auto i = r1.vi; i < r2.vi; i++)
+            for (auto i = r1.vi; i <= r2.vi; i++)
                 r.vai.push_back(i);
         } else {
-            for (auto i = r1.vi; i > r2.vi; i--)
+            for (auto i = r1.vi; i >= r2.vi; i--)
                 r.vai.push_back(i);
         }
         pst->push_back(r);
@@ -1923,15 +1923,6 @@ class IndraLink {
                 ila = newFunc[pc];
                 if (ila.t == FLOW_CONTROL) {
                     if (ila.name == "for") {
-                        /*
-                        if (pc < 1) {
-                            res.t = ERROR;
-                            res.vs = "Not enough stack data before 'for' instruction (1 required)";
-                            abort = true;
-                            pst->push_back(res);
-                            break;
-                        }
-                        */
                         for_level.push_back(pc);
                         last_loop = "for";
                     } else if (ila.name == "next") {
@@ -1947,26 +1938,20 @@ class IndraLink {
                         newFunc[for_address].jump_address = pc;
                         for_level.pop_back();
                     } else if (ila.name == "if") {
-                        if (pst->size() < 1) {
-                            res.t = ERROR;
-                            res.vs = "Not enough stack data before 'if' instruction (1 required)";
-                            abort = true;
-                            pst->push_back(res);
-                            break;
-                        }
                         if_level.push_back(pc);
+                        else_level.push_back(-1);
                         newFunc[pc].jump_address = 0;
                     } else if (ila.name == "else") {
-                        if (if_level.size() - else_level.size() != 1) {
+                        if (if_level.size() < 1 || else_level.back() != -1) {
                             res.t = ERROR;
-                            res.vs = "Unexpected 'else' statement!";
+                            res.vs = "Unexpected 'else' statement, e-level:" + std::to_string(else_level.back());
                             abort = true;
                             pst->push_back(res);
                             break;
                         }
                         int if_address = if_level.back();
                         newFunc[if_address].jump_address = pc;
-                        else_level.push_back(if_address);
+                        else_level[else_level.size() - 1] = pc;
                     } else if (ila.name == "endif") {
                         if (if_level.size() == 0) {
                             res.t = ERROR;
@@ -1983,6 +1968,7 @@ class IndraLink {
                             newFunc[else_address].jump_address = pc;
                         }
                         if_level.pop_back();
+                        else_level.pop_back();
                     } else if (ila.name == "while") {
                         /*
                         if (pc < 1) {
@@ -2251,7 +2237,34 @@ class IndraLink {
                             res.t = BOOL;
                             res.vb = false;
                             pst->push_back(res);
+                        } else if (last_loop == "for") {
+                            IlAtom for_array = pst->back();
+                            pst->pop_back();
+                            switch (for_array.t) {
+                            case INT_ARRAY:
+                                for_array.vai.clear();
+                                pst->push_back(for_array);
+                                break;
+                            case FLOAT_ARRAY:
+                                for_array.vaf.clear();
+                                pst->push_back(for_array);
+                                break;
+                            case BOOL_ARRAY:
+                                for_array.vab.clear();
+                                pst->push_back(for_array);
+                                break;
+                            case STRING_ARRAY:
+                                for_array.vas.clear();
+                                pst->push_back(for_array);
+                                break;
+                            default:
+                                res.t = ERROR;
+                                res.vs = "Illegal array-type on for-break";
+                                abort = 1;
+                                pst->push_back(res);
+                            }
                         }
+                        cout << "break";
                         pc = ila.jump_address - 1;
                     } else if (ila.name == "return") {
                         pc = newFunc.size();
@@ -2328,6 +2341,21 @@ class IndraLink {
                         case INT_ARRAY:
                             res.t = INT_ARRAY;
                             res.vai = sym.vai;
+                            res.vs = sym.str();
+                            break;
+                        case FLOAT_ARRAY:
+                            res.t = FLOAT_ARRAY;
+                            res.vaf = sym.vaf;
+                            res.vs = sym.str();
+                            break;
+                        case BOOL_ARRAY:
+                            res.t = BOOL_ARRAY;
+                            res.vab = sym.vab;
+                            res.vs = sym.str();
+                            break;
+                        case STRING_ARRAY:
+                            res.t = STRING_ARRAY;
+                            res.vas = sym.vas;
                             res.vs = sym.str();
                             break;
                         case ERROR:
