@@ -14,26 +14,36 @@ Indralink is primarily a stack language: functions operate on values that are pu
 1 2 +
 ```
 
+gives `3`. 
+
 ### Functions
 
-gives `3`. Functions can be defined with `: <func-name> ... ;` syntax similar to Forth. Comments are
+Functions can be defined with `: <func-name> ... ;` syntax similar to Forth. Comments are
 anything between `( ... )` and (in files only) from `\` up to line-end, as in Forth.
 
 In repl, functions are on one line, in files (`load`, `save` e.b.), function can be formatted arbitrarily.
 
 ```indralink
-: plus2 (INT n -- n+2) 2 + ;    \ The comment in brackets () uses Forth style: an INT argument n is expected on stack, a result n+2 is put on stack.
+: plus2 2 + ;
 ```
-then
+
+or, equivalent with comments:
+
 ```indralink
-1 plus2 print  \ put 1 on stack, call function plus2 and print the result that is on the stack.
+: plus2 (INT n -- n+2) 2 + ;    \ The comment in brackets () uses Forth style: stack in/out
+```
+
+then
+
+```indralink
+1 plus2 print  \ put 1 on stack, call function plus2 and print the result from stack.
 ```
 
 gives `3`.
 
 ### Variables
 
-Local and global variables can be used, global variables start with `$`.
+Local and global variables can be used, global variable names start with `$`.
 
 ```
 1 >a   \ store 1 into local variable a. a is only valid during execution of the current context, e.g. this works:
@@ -152,5 +162,56 @@ Prints `2 4 6` too: In the for loop the current element is stored into variable 
 
 gives "54321". 5 is stored to var `n`, true is set for intial `while` condition, `n` is printed and decremented by one. The next condition for the while-loop is the compare `n 0 >`, the loop continues as long as n>0.
 
+## Various built-ins
+
+### stack and heap
+
+- `ss` stack size is put on stack as INT
+- `cs` clear stack
+- `listvars` show all global variables
+- `listfuncs` list all defined functions
+- `"filename" save` Save all currently defined functions into file "filename"
+- `"filename" load` Load functions from "filename"
+- `dup` duplicate last stack entry
+- `drop` remove last entry from stack
+- `dup2` last two stack elements: `a b` becomes `a b a b` on stack
+- `swap` swap last two stack elements `a b` becomes `b a`
+- `eval` evaluate a string as code
+- `print` or `.` print last element on stack
+- `printstack` print entire stack
+
+### Arrays
+
+- `range` gnerates an array of successive ints starting using the last two stack elements (INT) as inclusive borders. `3 1 range` generates `[3 2 1]`.
+- `remove`. Arguments from stack: array and (zero-based) index to be removed. `[1 2 3] 1 remove` generates `[1 3]`
+- `append`. Append an element (must be of same type) to an array. `["Hello" "my"] "world" append` gives `["Hello" "my" "world"]`.
+- `update`. Updates the array content at a given index. `[false true] 1 false update` gives `[false false]`
+- `index`. Read array element at index: `[4.1 5.1 6.1] 1 index` gets `5.1`
+- `len`. Puts array length on stack as INT.
+- `erase`. Removes all elements from array, leaving an empty array.
+- `[int], [bool], [string], [float]`. Create empty arrays of given type.
+
+### Type conversion
+
+- `array`. Convert BOOL, INT, FLOAT, or STRING into a corresponding array of length 1.
+- `int`. Convert to int
+- `float`. Convert to float
+- `bool`. Convert to float (String: 'true', false, numbers: only 0 or 0.0 is false)
+- `string`. Convert to string
+
+### String handling
+
+- `len`. Put string length on stack as INT.
+- `split`. A string is cut at a token. `"abc" "" split` expands each char into `["a" "b" "c"]`. `"1-x2-x3" "-x" split` generates `["1" "2" "3"]`
+- `substring`. A substring at given pos and length is extracted. `"Hello, world" 3 4 substring` gives `"lo, "`.
+- `sum`. Concatenates STRING_ARRAY components into single string. `["a" "b" "c"] sum` gives `"abc"`.
+- `+`. Concatenate two strings from stack. `"a" "b" +` gives `"ab"`.
+  
+### Arithmetic
+
+- Dual operators are: `+`, `-`, `*`, `/`, `%`
+- Compare: `==`, `!=`, `>=`, `<=`, `<`, `>`
+- Boolean: `and`, `or`
+- `sum`: Add all array elements
 
 
