@@ -31,7 +31,7 @@ Indralink is primarily a stack language: functions operate on values that are pu
 1 2 +
 ```
 
-gives `3` on stack. `print` shows the last stack content:
+puts 1 and 2 on the stack, takes two arguments from stack and adds them and puts the result `3` on the stack. `print` shows the last element on the stack:
 
 ```
 1 2 + print
