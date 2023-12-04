@@ -175,9 +175,11 @@ void repl(std::string &prompt, std::string &prompt2) {
         std::cout << std::endl;
         auto start = std::chrono::steady_clock::now();
         int used_cycles = 0;
-        il.eval(ps, &st, &used_cycles, 5000);
+        int max_cycles = 0;  // 0: no max
+        il.eval(ps, &st, &used_cycles, max_cycles);
         auto diff = std::chrono::steady_clock::now() - start;
         std::cout << std::endl;
+        /*
         std::cout << "Stack: |";
         bool first = true;
         for (auto s : st) {
@@ -188,11 +190,11 @@ void repl(std::string &prompt, std::string &prompt2) {
             std::cout << s.str();
         }
         std::cout << "|" << std::endl;
-
+        */
         std::cout << "Eval dt: "
                   << std::chrono::duration<double, std::nano>(diff).count()
                   << " ns"
-                  << ", " << used_cycles << " cycles." << std::endl;
+                  << ", " << used_cycles << " cycles, stack size: " << st.size() << std::endl;
     }
 }
 

@@ -19,7 +19,7 @@ n isqrt >sqrt
 true ;
 
 : isqrt (n -- sqrt n) \ return integer sqrt approximation
-dup dup 2 /
+int dup dup 2 /
 dup2 != while
     dup2 dup >sqrt / + 2 /
     dup sqrt < loop

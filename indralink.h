@@ -1411,6 +1411,7 @@ class IndraLink {
         inbuilts["."] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["print"] = [&](vector<IlAtom> *pst) { print(pst); };
         inbuilts["printstack"] = [&](vector<IlAtom> *pst) { show_stack(pst); };
+        inbuilts["ps"] = [&](vector<IlAtom> *pst) { show_stack(pst); };
         inbuilts["listvars"] = [&](vector<IlAtom> *pst) { list_vars(pst); };
         inbuilts["listfuncs"] = [&](vector<IlAtom> *pst) { list_funcs(pst); };
         inbuilts["save"] = [&](vector<IlAtom> *pst) { save(pst); };

@@ -195,7 +195,7 @@ gives "54321". 5 is stored to var `n`, true is set for intial `while` condition,
 - `swap` swap last two stack elements `a b` becomes `b a`
 - `eval` evaluate a string as code
 - `print` or `.` print last element on stack
-- `printstack` print entire stack
+- `printstack` or `ps` print entire stack
 
 ### Arrays
 
