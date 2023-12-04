@@ -41,16 +41,27 @@ then
 
 gives `3`.
 
+```
+!plus2    \ delete plus2 defintion
+```
+
+Deletes the function.
+
 ### Variables
 
 Local and global variables can be used, global variable names start with `$`.
+
+Assignment works from stack by prefix `>` to the variable name.
+
+Prefix `!` deletes a variable
 
 ```
 1 >a   \ store 1 into local variable a. a is only valid during execution of the current context, e.g. this works:
 1 >a a 1 + print
 ```
 
-Prints `2`.
+Prints `2`" 1 is stored into `a`, then `a` is put on stack, 1 is added 
+and the result is print from stack.
 
 ```
 1 >a
@@ -67,6 +78,12 @@ $a print
 
 Both work, the second line looks for a local var `a`, if there is none, a global var `$a` is searched and found.
 
+```
+!$a
+```
+
+Deletes global variable a.
+
 ### Data-types
 
 Known data-types are INT, FLOAT, BOOL, STRING, INT_ARRAY, FLOAT_ARRAY, STRING_ARRAY, BOOL_ARRAY
@@ -78,7 +95,7 @@ true >$b  \ global bool
 33 >$i \ global int
 ```
 
-Global vars can be listes with `listvars`
+Global vars can be listed with `listvars`.
 
 #### Arrays
 
