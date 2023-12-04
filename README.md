@@ -20,7 +20,7 @@ ninja
 start with:
 
 ```bash
-indralink
+./indralink
 ```
 
 ## Preliminary language description
