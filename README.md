@@ -37,7 +37,7 @@ puts 1 and 2 on the stack, takes two arguments from stack and adds them and puts
 1 2 + print
 ```
 
-outputs `3`.
+outputs `3`. `1 2 + 4.0 / print` results in `0.750000`. It works like an old HP RPN calculator.
 
 ### Functions
 
