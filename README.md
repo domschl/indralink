@@ -6,6 +6,23 @@ Any aspect of Indralink is provisional and subject to change.
 
 Target is to use Indralink for embedded scripting (e.g. with Muwerk)
 
+## Build
+
+Requires `cmake`, `ninja` (`brew install cmake ninja`)
+
+```bash
+mkdir build
+cd build
+cmake -G Ninja ..
+ninja
+```
+
+start with:
+
+```bash
+indralink
+```
+
 ## Preliminary language description
 
 Indralink is primarily a stack language: functions operate on values that are pushed on the stack:
@@ -14,7 +31,13 @@ Indralink is primarily a stack language: functions operate on values that are pu
 1 2 +
 ```
 
-gives `3`. 
+gives `3` on stack. `print` shows the last stack content:
+
+```
+1 2 + print
+```
+
+outputs `3`.
 
 ### Functions
 
