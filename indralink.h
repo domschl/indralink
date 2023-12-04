@@ -1273,11 +1273,20 @@ class IndraLink {
         pst->clear();
     }
 
-    void list_vars(vector<IlAtom> *pst) {
+    void list_vars(vector<IlAtom> *pst, map<string, IlAtom> *local_symbols = nullptr) {
+        if (local_symbols) {
+            cout << "--- Local ----------" << endl;
+            for (const auto &symPair : *local_symbols) {
+                IlAtom il = symPair.second;
+                cout << il.str() << " >" << symPair.first << endl;
+            }
+        }
+        cout << "--- Global ---------" << endl;
         for (const auto &symPair : symbols) {
             IlAtom il = symPair.second;
             cout << il.str() << " >" << symPair.first << endl;
         }
+        cout << "--------------------" << endl;
     }
 
     void list_funcs(vector<IlAtom> *pst) {
@@ -1646,6 +1655,7 @@ class IndraLink {
             vector<string> arr_els = split(arr);
             ilAtomTypes t = UNDEFINED;
             ilAtomTypes ti;
+            SYMBOL_TYPE syty;
             for (auto el : arr_els) {
                 ti = UNDEFINED;
                 if (is_comment(el)) continue;
@@ -1658,11 +1668,37 @@ class IndraLink {
                 else if (is_string(el))
                     ti = STRING;
                 if (ti == UNDEFINED) {
-                    if (symbols.find(el) != symbols.end()) {
-                        IlAtom sm = symbols[el];
-                        if (sm.t == INT || sm.t == FLOAT || sm.t == BOOL || sm.t == STRING) {
-                            ti = sm.t;
-                            el = sm.str();
+                    if (el == "int") {
+                        t = INT;
+                        m.t = INT_ARRAY;
+                        continue;
+                    } else if (el == "float") {
+                        t = FLOAT;
+                        m.t = FLOAT_ARRAY;
+                        continue;
+                    } else if (el == "bool") {
+                        t = BOOL;
+                        m.t = BOOL_ARRAY;
+                        continue;
+                    } else if (el == "string") {
+                        t = STRING;
+                        m.t = STRING_ARRAY;
+                        continue;
+                    } else {
+                        syty = symbol_type(el, nullptr);
+                        if (syty != SYMBOL_TYPE::NONE) {
+                            IlAtom sm;
+                            switch (syty) {
+                            // case SYMBOL_TYPE::LOCAL:
+                            //    sm = local_symbols[el];
+                            //    break;
+                            case SYMBOL_TYPE::GLOBAL:
+                                sm = symbols[el];
+                                if (sm.t == INT || sm.t == FLOAT || sm.t == BOOL || sm.t == STRING) {
+                                    ti = sm.t;
+                                    el = sm.str();
+                                }
+                            }
                         }
                     }
                 }
@@ -1758,9 +1794,23 @@ class IndraLink {
         return true;
     }
 
-    bool is_symbol(string symName) {
-        if (symbols.find(symName) == symbols.end()) return false;
-        return true;
+    enum SYMBOL_TYPE { NONE,
+                       LOCAL,
+                       GLOBAL };
+
+    SYMBOL_TYPE symbol_type(string symName, map<string, IlAtom> *local_symbols) {
+        if (symName.length() < 1) return SYMBOL_TYPE::NONE;
+        if (symName[0] != '$') {
+            if ((local_symbols) && (local_symbols->find(symName) != local_symbols->end())) return SYMBOL_TYPE::LOCAL;
+        }
+        if (symName[0] == '$') {
+
+            if (symbols.find(symName.substr(1)) != symbols.end()) return SYMBOL_TYPE::GLOBAL;
+
+        } else {
+            if (symbols.find(symName) != symbols.end()) return SYMBOL_TYPE::GLOBAL;
+        }
+        return SYMBOL_TYPE::NONE;
     }
 
     bool is_flow_control(string symName) {
@@ -1805,7 +1855,7 @@ class IndraLink {
         cout << ";" << endl;
     }
 
-    bool eval(vector<IlAtom> func, vector<IlAtom> *pst) {
+    bool eval(vector<IlAtom> func, vector<IlAtom> *pst, int *used_cycles = nullptr, int max_cycles = 0) {
         IlAtom res;
         bool abort = false;
         int pc = 0;
@@ -1814,11 +1864,12 @@ class IndraLink {
         bool is_def = false;
         vector<IlAtom> funcDef;
         vector<IlAtom> newFunc;
+        map<string, IlAtom> local_symbols;
         string err;
         vector<int> for_level, else_level, while_level, if_level;
         int cycles = 0;
         string last_loop = "";
-        // Exctract function defintions:
+        // Exctract function definitions:
         for (int pc = 0; pc < func.size(); pc++) {
             ila = func[pc];
             if (!is_def) {
@@ -2002,334 +2053,380 @@ class IndraLink {
                 pst->push_back(res);
             }
         }
-        // Eval:
-        last_loop = "";
-        while (!abort && pc < newFunc.size()) {
-            ++cycles;
-            if (cycles > 2500) {
-                cout << endl
-                     << "ABORT PROGRAM RUNTIME EXCEEDED" << endl;
-                abort = true;
-            }
-
-            ila = newFunc[pc];
-            // for (auto ila : func) {
-            switch (ila.t) {
-            case INT:
-            case FLOAT:
-            case BOOL:
-            case STRING:
-                pst->push_back(ila);
-                break;
-            case INT_ARRAY:
-            case FLOAT_ARRAY:
-            case BOOL_ARRAY:
-            case STRING_ARRAY:
-                if (ila.t == ERROR) {
+        if (!abort) {
+            // Eval:
+            last_loop = "";
+            SYMBOL_TYPE syty;
+            IlAtom sym;
+            while (!abort && pc < newFunc.size()) {
+                ++cycles;
+                if (max_cycles && cycles > max_cycles) {
+                    cout << endl
+                         << "ABORT PROGRAM RUNTIME EXCEEDED" << endl;
                     abort = true;
-                } else {
+                    sym.t = ERROR;
+                    sym.vs = "Calculation exceeded max_cycles " + std::to_string(max_cycles) + ", aborted.";
+                    pst->push_back(sym);
+                    continue;
+                }
+
+                ila = newFunc[pc];
+                // for (auto ila : func) {
+                switch (ila.t) {
+                case INT:
+                case FLOAT:
+                case BOOL:
+                case STRING:
                     pst->push_back(ila);
-                }
-                break;
-            case IFUNC:
-                ila.vif(pst);
-                if (pst->size() > 0) {
-                    if ((*pst)[pst->size() - 1].t == ERROR) {
-                        abort = true;
-                    }
-                }
-                break;
-            case FLOW_CONTROL:
-                if (ila.name == "if") {
-                    if (pst->size() == 0) {
-                        res.t = ERROR;
-                        res.vs = "Stack-underflow-on-if";
-                        pst->push_back(res);
+                    break;
+                case INT_ARRAY:
+                case FLOAT_ARRAY:
+                case BOOL_ARRAY:
+                case STRING_ARRAY:
+                    if (ila.t == ERROR) {
                         abort = true;
                     } else {
-                        IlAtom b = pst->back();
-                        pst->pop_back();
-                        if (b.t != BOOL && b.t != INT) {
-                            res.t = ERROR;
-                            res.vs = "No-int-or-bool-for-if";
-                            pst->push_back(res);
+                        pst->push_back(ila);
+                    }
+                    break;
+                case IFUNC:
+                    ila.vif(pst);
+                    if (pst->size() > 0) {
+                        if ((*pst)[pst->size() - 1].t == ERROR) {
                             abort = true;
-                        } else {
-                            if (b.t == BOOL) {
-                                if (b.vb) {
-                                    break;
-                                } else {
-                                    pc = ila.jump_address;
-                                }
-                            } else if (b.t == INT) {
-                                if (b.vi != 0) {
-                                    break;
-                                } else {
-                                    pc = ila.jump_address;
-                                }
-                            }
                         }
                     }
-                } else if (ila.name == "else") {
-                    pc = ila.jump_address;
-                } else if (ila.name == "endif") {
-                } else if (ila.name == "while") {
-                    if (pst->size() == 0) {
-                        res.t = ERROR;
-                        res.vs = "Stack-underflow-on-while";
-                        pst->push_back(res);
-                        abort = true;
-                    } else {
-                        last_loop = "while";
-                        IlAtom b = pst->back();
-                        pst->pop_back();
-                        if (b.t != BOOL && b.t != INT) {
+                    break;
+                case FLOW_CONTROL:
+                    if (ila.name == "if") {
+                        if (pst->size() == 0) {
                             res.t = ERROR;
-                            res.vs = "No-int-or-bool-for-while";
+                            res.vs = "Stack-underflow-on-if";
                             pst->push_back(res);
                             abort = true;
                         } else {
-                            if (b.t == BOOL) {
-                                if (b.vb) {
-                                    break;
-                                } else {
-                                    pc = ila.jump_address;
-                                }
-                            } else if (b.t == INT) {
-                                if (b.vi != 0) {
-                                    break;
-                                } else {
-                                    pc = ila.jump_address;
-                                }
-                            }
-                        }
-                    }
-                } else if (ila.name == "loop") {
-                    pc = ila.jump_address - 1;
-                } else if (ila.name == "for") {
-                    if (pst->size() == 0) {
-                        res.t = ERROR;
-                        res.vs = "Stack-underflow-on-for";
-                        pst->push_back(res);
-                        abort = true;
-                    } else {
-                        IlAtom b = pst->back();
-                        pst->pop_back();
-                        if (b.t != INT_ARRAY && b.t != STRING_ARRAY && b.t != FLOAT_ARRAY && b.t != BOOL_ARRAY) {
-                            res.t = ERROR;
-                            res.vs = "'for' requires an INT, STRING, FLOAT, or BOOL array stack";
-                            pst->push_back(res);
-                            abort = true;
-                        } else {
-                            last_loop = "for";
-                            switch (b.t) {
-                            case INT_ARRAY:
-                                if (b.vai.size() == 0) {
-                                    pc = ila.jump_address;
-                                } else {
-                                    IlAtom fi;
-                                    fi.t = INT;
-                                    fi.vi = b.vai[0];
-                                    fi.vs = std::to_string(fi.vi);
-                                    b.vai.erase(b.vai.begin());
-                                    pst->push_back(b);
-                                    pst->push_back(fi);
-                                }
-                                break;
-                            case FLOAT_ARRAY:
-                                if (b.vaf.size() == 0) {
-                                    pc = ila.jump_address;
-                                } else {
-                                    IlAtom fi;
-                                    fi.t = FLOAT;
-                                    fi.vf = b.vaf[0];
-                                    fi.vs = std::to_string(fi.vf);
-                                    b.vaf.erase(b.vaf.begin());
-                                    pst->push_back(b);
-                                    pst->push_back(fi);
-                                }
-                                break;
-                            case BOOL_ARRAY:
-                                if (b.vab.size() == 0) {
-                                    pc = ila.jump_address;
-                                } else {
-                                    IlAtom fi;
-                                    fi.t = BOOL;
-                                    fi.vb = b.vab[0];
-                                    if (fi.vb)
-                                        fi.vs = "true";
-                                    else
-                                        fi.vs = "false";
-                                    b.vab.erase(b.vab.begin());
-                                    pst->push_back(b);
-                                    pst->push_back(fi);
-                                }
-                                break;
-                            case STRING_ARRAY:
-                                if (b.vas.size() == 0) {
-                                    pc = ila.jump_address;
-                                } else {
-                                    IlAtom fi;
-                                    fi.t = STRING;
-                                    fi.vs = b.vas[0];
-                                    b.vas.erase(b.vas.begin());
-                                    pst->push_back(b);
-                                    pst->push_back(fi);
-                                }
-                                break;
-                            default:
+                            IlAtom b = pst->back();
+                            pst->pop_back();
+                            if (b.t != BOOL && b.t != INT) {
                                 res.t = ERROR;
-                                res.vs = "'for' encounter illegal array type";
+                                res.vs = "No-int-or-bool-for-if";
                                 pst->push_back(res);
                                 abort = true;
-                                break;
+                            } else {
+                                if (b.t == BOOL) {
+                                    if (b.vb) {
+                                        break;
+                                    } else {
+                                        pc = ila.jump_address;
+                                    }
+                                } else if (b.t == INT) {
+                                    if (b.vi != 0) {
+                                        break;
+                                    } else {
+                                        pc = ila.jump_address;
+                                    }
+                                }
                             }
                         }
+                    } else if (ila.name == "else") {
+                        pc = ila.jump_address;
+                    } else if (ila.name == "endif") {
+                    } else if (ila.name == "while") {
+                        if (pst->size() == 0) {
+                            res.t = ERROR;
+                            res.vs = "Stack-underflow-on-while";
+                            pst->push_back(res);
+                            abort = true;
+                        } else {
+                            last_loop = "while";
+                            IlAtom b = pst->back();
+                            pst->pop_back();
+                            if (b.t != BOOL && b.t != INT) {
+                                res.t = ERROR;
+                                res.vs = "No-int-or-bool-for-while";
+                                pst->push_back(res);
+                                abort = true;
+                            } else {
+                                if (b.t == BOOL) {
+                                    if (b.vb) {
+                                        break;
+                                    } else {
+                                        pc = ila.jump_address;
+                                    }
+                                } else if (b.t == INT) {
+                                    if (b.vi != 0) {
+                                        break;
+                                    } else {
+                                        pc = ila.jump_address;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (ila.name == "loop") {
+                        pc = ila.jump_address - 1;
+                    } else if (ila.name == "for") {
+                        if (pst->size() == 0) {
+                            res.t = ERROR;
+                            res.vs = "Stack-underflow-on-for";
+                            pst->push_back(res);
+                            abort = true;
+                        } else {
+                            IlAtom b = pst->back();
+                            pst->pop_back();
+                            if (b.t != INT_ARRAY && b.t != STRING_ARRAY && b.t != FLOAT_ARRAY && b.t != BOOL_ARRAY) {
+                                res.t = ERROR;
+                                res.vs = "'for' requires an INT, STRING, FLOAT, or BOOL array stack";
+                                pst->push_back(res);
+                                abort = true;
+                            } else {
+                                last_loop = "for";
+                                switch (b.t) {
+                                case INT_ARRAY:
+                                    if (b.vai.size() == 0) {
+                                        pc = ila.jump_address;
+                                    } else {
+                                        IlAtom fi;
+                                        fi.t = INT;
+                                        fi.vi = b.vai[0];
+                                        fi.vs = std::to_string(fi.vi);
+                                        b.vai.erase(b.vai.begin());
+                                        pst->push_back(b);
+                                        pst->push_back(fi);
+                                    }
+                                    break;
+                                case FLOAT_ARRAY:
+                                    if (b.vaf.size() == 0) {
+                                        pc = ila.jump_address;
+                                    } else {
+                                        IlAtom fi;
+                                        fi.t = FLOAT;
+                                        fi.vf = b.vaf[0];
+                                        fi.vs = std::to_string(fi.vf);
+                                        b.vaf.erase(b.vaf.begin());
+                                        pst->push_back(b);
+                                        pst->push_back(fi);
+                                    }
+                                    break;
+                                case BOOL_ARRAY:
+                                    if (b.vab.size() == 0) {
+                                        pc = ila.jump_address;
+                                    } else {
+                                        IlAtom fi;
+                                        fi.t = BOOL;
+                                        fi.vb = b.vab[0];
+                                        if (fi.vb)
+                                            fi.vs = "true";
+                                        else
+                                            fi.vs = "false";
+                                        b.vab.erase(b.vab.begin());
+                                        pst->push_back(b);
+                                        pst->push_back(fi);
+                                    }
+                                    break;
+                                case STRING_ARRAY:
+                                    if (b.vas.size() == 0) {
+                                        pc = ila.jump_address;
+                                    } else {
+                                        IlAtom fi;
+                                        fi.t = STRING;
+                                        fi.vs = b.vas[0];
+                                        b.vas.erase(b.vas.begin());
+                                        pst->push_back(b);
+                                        pst->push_back(fi);
+                                    }
+                                    break;
+                                default:
+                                    res.t = ERROR;
+                                    res.vs = "'for' encounter illegal array type";
+                                    pst->push_back(res);
+                                    abort = true;
+                                    break;
+                                }
+                            }
+                        }
+                    } else if (ila.name == "next") {
+                        pc = ila.jump_address - 1;
+                    } else if (ila.name == "break") {
+                        if (last_loop == "while") {
+                            res.t = BOOL;
+                            res.vb = false;
+                            pst->push_back(res);
+                        }
+                        pc = ila.jump_address - 1;
+                    } else if (ila.name == "return") {
+                        pc = newFunc.size();
                     }
-                } else if (ila.name == "next") {
-                    pc = ila.jump_address - 1;
-                } else if (ila.name == "break") {
-                    if (last_loop == "while") {
-                        res.t = BOOL;
-                        res.vb = false;
-                        pst->push_back(res);
-                    }
-                    pc = ila.jump_address - 1;
-                } else if (ila.name == "return") {
-                    pc = newFunc.size();
-                }
-                break;
-            case FUNC:
-                if (is_func(ila.name)) {
-                    eval(funcs[ila.name], pst);
-                } else {
-                    res.t = ERROR;
-                    res.vs = "Func-does-not-exist: " + ila.name;
-                    abort = true;
                     break;
-                }
-                break;
-            case SHOW_FUNC:
-                if (is_func(ila.name)) {
-                    show_func(ila.name);
-                } else {
-                    res.t = ERROR;
-                    res.vs = "Func-does-not-exist: " + ila.name;
-                    abort = true;
-                    break;
-                }
-                break;
-            case DELETE_FUNC:
-                if (is_func(ila.name)) {
-                    funcs.erase(ila.name);
-                } else {
-                    res.t = ERROR;
-                    res.vs = "Func-does-not-exist: " + ila.name;
-                    abort = true;
-                    break;
-                }
-            case SYMBOL:
-                if (is_symbol(ila.name)) {
-                    IlAtom sym = symbols[ila.name];
-                    switch (sym.t) {
-                    case INT:
-                        res.t = INT;
-                        res.vi = sym.vi;
-                        res.vs = std::to_string(sym.vi);
-                        break;
-                    case FLOAT:
-                        res.t = FLOAT;
-                        res.vf = sym.vf;
-                        res.vs = std::to_string(sym.vf);
-                        break;
-                    case BOOL:
-                        res.t = BOOL;
-                        res.vb = sym.vb;
-                        if (res.vb)
-                            res.vs = "true";
-                        else
-                            res.vb = "false";
-                        break;
-                    case STRING:
-                        res.t = STRING;
-                        res.vs = sym.vs;
-                        break;
-                    case INT_ARRAY:
-                        res.t = INT_ARRAY;
-                        res.vai = sym.vai;
-                        res.vs = sym.str();
-                        break;
-                    default:
-                        res.t = ERROR;
-                        res.vs = "Illegal-Symbol-content-type";
-                        abort = true;
-                        break;
-                    }
-                    pst->push_back(res);
-                } else {
-                    if (is_func(ila.name)) {  // If a function gets defined during current command, it might have been parsed at unknown symbol
-                        eval(funcs[ila.name], pst);
+                case FUNC:
+                    if (is_func(ila.name)) {
+                        eval(funcs[ila.name], pst, used_cycles, max_cycles);
                     } else {
                         res.t = ERROR;
-                        res.vs = "Undefined-symbol-reference: <" + ila.name + ">";
+                        res.vs = "Func-does-not-exist: " + ila.name;
+                        abort = true;
+                        break;
+                    }
+                    break;
+                case SHOW_FUNC:
+                    if (is_func(ila.name)) {
+                        show_func(ila.name);
+                    } else {
+                        res.t = ERROR;
+                        res.vs = "Func-does-not-exist: " + ila.name;
+                        abort = true;
+                        break;
+                    }
+                    break;
+                case DELETE_FUNC:
+                    if (is_func(ila.name)) {
+                        funcs.erase(ila.name);
+                    } else {
+                        res.t = ERROR;
+                        res.vs = "Func-does-not-exist: " + ila.name;
+                        abort = true;
+                        break;
+                    }
+                    break;
+                case SYMBOL:
+                    syty = symbol_type(ila.name, &local_symbols);
+                    sym.t = ERROR;
+                    sym.vs = "Bad symbol type";
+                    if (syty != SYMBOL_TYPE::NONE) {
+                        if (syty == SYMBOL_TYPE::LOCAL)
+                            sym = local_symbols[ila.name];
+                        else if (syty == SYMBOL_TYPE::GLOBAL) {
+                            if (ila.name[0] == '$') {
+                                sym = symbols[ila.name.substr(1)];
+
+                            } else {
+                                sym = symbols[ila.name];
+                            }
+                        }
+                        switch (sym.t) {
+                        case INT:
+                            res.t = INT;
+                            res.vi = sym.vi;
+                            res.vs = std::to_string(sym.vi);
+                            break;
+                        case FLOAT:
+                            res.t = FLOAT;
+                            res.vf = sym.vf;
+                            res.vs = std::to_string(sym.vf);
+                            break;
+                        case BOOL:
+                            res.t = BOOL;
+                            res.vb = sym.vb;
+                            if (res.vb)
+                                res.vs = "true";
+                            else
+                                res.vb = "false";
+                            break;
+                        case STRING:
+                            res.t = STRING;
+                            res.vs = sym.vs;
+                            break;
+                        case INT_ARRAY:
+                            res.t = INT_ARRAY;
+                            res.vai = sym.vai;
+                            res.vs = sym.str();
+                            break;
+                        case ERROR:
+                            res = sym;
+                            break;
+                        default:
+                            res.t = ERROR;
+                            res.vs = "Illegal-Symbol-content-type";
+                            abort = true;
+                            break;
+                        }
+                        pst->push_back(res);
+                    } else {
+                        if (is_func(ila.name)) {  // If a function gets defined during current command, it might have been parsed at unknown symbol
+                            eval(funcs[ila.name], pst);
+                        } else {
+                            res.t = ERROR;
+                            res.vs = "Undefined-symbol-reference: <" + ila.name + ">";
+                            pst->push_back(res);
+                            abort = true;
+                        }
+                    }
+                    break;
+                case STORE_SYMBOL:
+                    if (is_reserved(ila.name) || is_func(ila.name)) {
+                        res.t = ERROR;
+                        res.vs = "Name-in-use-by-func";
                         pst->push_back(res);
                         abort = true;
+                        break;
                     }
-                }
-                break;
-            case STORE_SYMBOL:
-                if (is_reserved(ila.name) || is_func(ila.name)) {
+                    if (pst->size() < 1) {
+                        res.t = ERROR;
+                        res.vs = "Symdef-stack-underflow";
+                        pst->push_back(res);
+                        abort = true;
+                        break;
+                    }
+                    res = pst->back();
+                    pst->pop_back();
+                    if (res.t != INT && res.t != FLOAT && res.t != BOOL && res.t != STRING && res.t != INT_ARRAY && res.t != FLOAT_ARRAY && res.t != BOOL_ARRAY && res.t != STRING_ARRAY) {
+                        res.t = ERROR;
+                        res.vs = "Symdef-invalid-type";
+                        pst->push_back(res);
+                        abort = true;
+                        break;
+                    }
+                    if (ila.name[0] == '>' || ila.name[0] == '!') {
+                        res.t = ERROR;
+                        res.vs = "Symdef-invalid-name";
+                        pst->push_back(res);
+                        abort = true;
+                        break;
+                    }
+                    syty = symbol_type(ila.name, &local_symbols);
+                    if (syty == SYMBOL_TYPE::GLOBAL)
+                        if (ila.name[0] == '$') {
+                            symbols[ila.name.substr(1)] = res;
+                        } else {
+                            symbols[ila.name] = res;
+                        }
+                    else if (ila.name[0] == '$') {
+                        symbols[ila.name.substr(1)] = res;
+                    } else {
+                        local_symbols[ila.name] = res;
+                    }
+                    break;
+                case DELETE_SYMBOL:
+                    syty = symbol_type(ila.name, &local_symbols);
+                    switch (syty) {
+                    case SYMBOL_TYPE::NONE:
+                        res.t = ERROR;
+                        res.vs = "Symdelete-non-existant";
+                        pst->push_back(res);
+                        abort = true;
+                        break;
+                    case SYMBOL_TYPE::LOCAL:
+                        local_symbols.erase(ila.name);
+                        break;
+                    case SYMBOL_TYPE::GLOBAL:
+                        if (ila.name[0] == '$') {
+                            symbols.erase(ila.name.substr(1));
+                        } else {
+                            symbols.erase(ila.name);
+                        }
+                        break;
+                    }
+                    break;
+                case COMMENT:
+                    break;
+                default:
                     res.t = ERROR;
-                    res.vs = "Name-in-use-by-func";
+                    res.vs = "Not-implemented";
                     pst->push_back(res);
                     abort = true;
                     break;
                 }
-                if (pst->size() < 1) {
-                    res.t = ERROR;
-                    res.vs = "Symdef-stack-underflow";
-                    pst->push_back(res);
-                    abort = true;
-                    break;
-                }
-                res = pst->back();
-                pst->pop_back();
-                if (res.t != INT && res.t != FLOAT && res.t && BOOL && res.t != STRING && res.t != INT_ARRAY && res.t != FLOAT_ARRAY && res.t != BOOL_ARRAY && res.t != STRING_ARRAY) {
-                    res.t = ERROR;
-                    res.vs = "Symdef-invalid-type";
-                    pst->push_back(res);
-                    abort = true;
-                    break;
-                }
-                if (ila.name[0] == '>' || ila.name[0] == '!') {
-                    res.t = ERROR;
-                    res.vs = "Symdef-invalid-name";
-                    pst->push_back(res);
-                    abort = true;
-                    break;
-                }
-                symbols[ila.name] = res;
-                break;
-            case DELETE_SYMBOL:
-                if (!is_symbol(ila.name)) {
-                    res.t = ERROR;
-                    res.vs = "Symdelete-non-existant";
-                    pst->push_back(res);
-                    abort = true;
-                    break;
-                }
-                symbols.erase(ila.name);
-                break;
-            case COMMENT:
-                break;
-            default:
-                res.t = ERROR;
-                res.vs = "Not-implemented";
-                pst->push_back(res);
-                abort = true;
-                break;
+                ++pc;
             }
-            ++pc;
         }
         if (abort) {
             if (pst->size() > 0 && (*pst)[pst->size() - 1].t == ERROR) {
@@ -2341,7 +2438,7 @@ class IndraLink {
                      << "Terminated with error condition, but no error on stack!" << endl;
             }
         }
-
+        if (used_cycles) *used_cycles += cycles;
         return !abort;
     }
 };

@@ -174,7 +174,9 @@ void repl(std::string &prompt, std::string &prompt2) {
         // }
         std::cout << std::endl;
         auto start = std::chrono::steady_clock::now();
-        il.eval(ps, &st);
+        int used_cycles = 0;
+        il.eval(ps, &st, &used_cycles, 5000);
+        auto diff = std::chrono::steady_clock::now() - start;
         std::cout << std::endl;
         std::cout << "Stack: |";
         bool first = true;
@@ -187,10 +189,10 @@ void repl(std::string &prompt, std::string &prompt2) {
         }
         std::cout << "|" << std::endl;
 
-        auto diff = std::chrono::steady_clock::now() - start;
         std::cout << "Eval dt: "
                   << std::chrono::duration<double, std::nano>(diff).count()
-                  << " ns" << std::endl;
+                  << " ns"
+                  << ", " << used_cycles << " cycles." << std::endl;
     }
 }
 
