@@ -201,7 +201,7 @@ gives "54321". 5 is stored to var `n`, true is set for intial `while` condition,
 
 - `range` gnerates an array of successive ints starting using the last two stack elements (INT) as inclusive borders. `3 1 range` generates `[3 2 1]`.
 - `remove`. Arguments from stack: array and (zero-based) index to be removed. `[1 2 3] 1 remove` generates `[1 3]`
-- `append`. Append an element (must be of same type) to an array. `["Hello" "my"] "world" append` gives `["Hello" "my" "world"]`.
+- `append`. Append an element (must be of same type) to an array. `["Hello" "my"] "world" append` gives `["Hello" "my" "world"]`. Note that appending happens only on stack.
 - `update`. Updates the array content at a given index. `[false true] 1 false update` gives `[false false]`
 - `index`. Read array element at index: `[4.1 5.1 6.1] 1 index` gets `5.1`
 - `len`. Puts array length on stack as INT.

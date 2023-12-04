@@ -981,13 +981,13 @@ class IndraLink {
         pst->pop_back();
         if (r1.t == INT) {
             res.t = FLOAT;
-            res.vf = (double)res.vi;
+            res.vf = (double)r1.vi;
             res.vs = std::to_string(res.vf);
             pst->push_back(res);
         } else if (r1.t == FLOAT) {
             res.t = FLOAT;
             res.vf = r1.vf;
-            res.vs = std::to_string(res.vf);
+            res.vs = std::to_string(r1.vf);
             pst->push_back(res);
         } else if (r1.t == BOOL) {
             res.t = FLOAT;
@@ -1032,7 +1032,7 @@ class IndraLink {
             res.t = BOOL;
             if (r1.vi) {
                 res.vb = true;
-                res.vs = true;
+                res.vs = "true";
             } else {
                 res.vb = false;
                 res.vs = "false";

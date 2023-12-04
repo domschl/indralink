@@ -26,11 +26,17 @@ dup2 != while
 drop drop drop
 sqrt ;
 
-: primes (n -- ) \ list primes up to n
+: primes (n -- [primes]) \ list primes up to n
+[int] >primes_list
 >end 0 >n
 n end <= while
     n isprime if
-        n print " " print
+        primes_list n append >primes_list
     endif
     n 1 + >n
-    n end <= loop ;
+    n end <= loop 
+primes_list ;
+
+100 primes len
+
+
