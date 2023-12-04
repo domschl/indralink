@@ -129,5 +129,28 @@ The `for` expression iterates over an array on the stack. `break` exists the loo
 generates `1 2 3 4 5 6 7 8 9 10`. `1 10 range` generates an integer-array with 10 elements from 1 to 10. The for loop iterates over the array and prints the current element followed by a `" "`.
 
 ```
-1 10 range for dup dup 2 % 0 == if print " " print else drop endif 4 == if ">" print break else "<" print endif next
+1 10 range for dup dup 2 % 0 == if print " " print else drop endif 7 == if break endif next
 ```
+
+Prints `2 4 6`: An array of ints 1..10 is pushed to stack. The for loop enumerates all elements, the current element on stack is duplicated twice, it's now on the stack in 3 copies. The first copy is used for mod 2 calculation, if divisible by two, the second copy is printed otherwise discarded by drop. The third copy is used for a compare with 7, and on equal, the loop is broken.
+
+Alternatively a local variable could be used:
+
+```
+1 10 range for >n n 2 % 0 == if n print " " print endif n 7 == if break endif next
+```
+
+Prints `2 4 6` too: In the for loop the current element is stored into variable `n` by `>n`. Then `n` is put on the stack to calculate `n 2 %`. `n` is then used further to print the divisble elements and to check for abort.
+
+#### `while`, `break`, `loop`
+
+`while` expects a boolean on the stack: on `true`, the loop content is executed. `break` exists the loop at any time.
+
+```
+5 >n true while n print n 1 - >n n 0 > loop
+```
+
+gives "54321". 5 is stored to var `n`, true is set for intial `while` condition, `n` is printed and decremented by one. The next condition for the while-loop is the compare `n 0 >`, the loop continues as long as n>0.
+
+
+
