@@ -769,7 +769,7 @@ class IndraLink {
                 return;
             }
             res.t = FLOAT;
-            res.vi = r1.vaf[r2.vi];
+            res.vf = r1.vaf[r2.vi];
             res.vs = std::to_string(res.vf);
             pst->push_back(res);
         } else if (r1.t == BOOL_ARRAY && r2.t == INT) {
@@ -782,7 +782,7 @@ class IndraLink {
             }
             res.t = BOOL;
             res.vb = r1.vab[r2.vi];
-            if (res.t)
+            if (res.vb)
                 res.vs = "true";
             else
                 res.vs = "false";
