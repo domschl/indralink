@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <algorithm>
+// #include <algorithm>
 #include <map>
 #include <functional>
 
@@ -1815,6 +1815,7 @@ class IndraLink {
     }
 
     bool is_flow_control(string symName) {
+        // if (flow_control_words.find(symName) == flow_control_words.end()) return false;
         if (std::find(flow_control_words.begin(), flow_control_words.end(), symName) == flow_control_words.end()) return false;
         return true;
     }
