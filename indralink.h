@@ -140,6 +140,8 @@ class IlAtom {
         case ERROR:
             return "\n [Error: " + vs + "] ";
             break;
+        case UNDEFINED:
+            return "<UNDEFINED>";
         }
         return "[UNEXPECTED TYPE]";
     }
