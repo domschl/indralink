@@ -1258,7 +1258,7 @@ class IndraLink {
     }
 
     void show_stack(vector<IlAtom> *pst) {
-        cout << "[";
+        cout << "⟦";
         bool first = true;
         for (auto il : *pst) {
             if (first) {
@@ -1268,7 +1268,7 @@ class IndraLink {
             }
             cout << il.str();
         }
-        cout << "]" << endl;
+        cout << "⟧" << endl;
     }
 
     void clear_stack(vector<IlAtom> *pst) {
@@ -1696,11 +1696,18 @@ class IndraLink {
                             //    sm = local_symbols[el];
                             //    break;
                             case SYMBOL_TYPE::GLOBAL:
-                                sm = symbols[el];
+                                if (el[0] == '$')
+                                    sm = symbols[el.substr(1)];
+                                else
+                                    sm = symbols[el];
                                 if (sm.t == INT || sm.t == FLOAT || sm.t == BOOL || sm.t == STRING) {
                                     ti = sm.t;
                                     el = sm.str();
                                 }
+                                continue;
+                            case SYMBOL_TYPE::LOCAL:  // XXX we don't have access here!
+                            case SYMBOL_TYPE::NONE:
+                                break;
                             }
                         }
                     }
@@ -1807,9 +1814,7 @@ class IndraLink {
             if ((local_symbols) && (local_symbols->find(symName) != local_symbols->end())) return SYMBOL_TYPE::LOCAL;
         }
         if (symName[0] == '$') {
-
             if (symbols.find(symName.substr(1)) != symbols.end()) return SYMBOL_TYPE::GLOBAL;
-
         } else {
             if (symbols.find(symName) != symbols.end()) return SYMBOL_TYPE::GLOBAL;
         }
