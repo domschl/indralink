@@ -1580,16 +1580,17 @@ class IndraLink {
         size_t pos = token.find('.');
         if (pos == string::npos) return false;
         string s1 = token.substr(0, pos);
-        if (!is_int(s1)) return false;
+        if (s1.length() > 0 && !is_int(s1)) return false;
         string s2 = token.substr(pos + 1);
+        if (s1.length() == 0 && s2.length() == 0) return false;
         pos = s2.find('e');
         if (pos == string::npos) pos = s2.find('E');
         if (pos == string::npos) {
-            if (!is_int(s2, true)) return false;
+            if (!is_int(s2, true) && s2.length() > 0) return false;
             return true;
         } else {
             string s1 = s2.substr(0, pos);
-            if (!is_int(s1, true)) return false;
+            if (!is_int(s1, true) && s1.length() > 0) return false;
             string s3 = s2.substr(pos + 1);
             if (!is_int(s3)) return false;
             return true;
