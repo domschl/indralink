@@ -152,7 +152,7 @@ gives `4`, zero-based array index 2 has value 4.
 
 gives `[0 2 6]`.
 
-`[1 2]` erase gives empty INT array `[]`
+`[1 2] erase` gives empty INT array `[]`
 
 Empty arrays can be generated with `[int], [float], [string], [bool]`
 
